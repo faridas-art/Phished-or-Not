@@ -342,12 +342,13 @@
                         isAuthListenerInitialized = true;
                         userId = user.uid;
 
-                        await loadPlayerData(userId, db);
+                        // Don't auto-load player data anymore - we'll load by nickname when needed
                         isFirebaseReady = true;
                         listenForScores(db);
                         
-                        // Expose database reference for nickname search
+                        // Expose database reference and functions
                         window.db = db;
+                        window.loadPlayerDataByNickname = loadPlayerDataByNickname;
                         
                         updateUI('firebase', userId);
                     }
@@ -357,65 +358,76 @@
                 async function loadPlayerData(uid, database) {
                     console.log("Loading player data for:", uid);
                     if (!database || !uid) return;
+                    
+                    // Player data is now stored by nickname, not by Firebase UID
+                    // We'll load this data when the user enters their nickname
+                }
+
+                // Load player data by nickname (new approach)
+                async function loadPlayerDataByNickname(nickname, database) {
+                    console.log("Loading player data for nickname:", nickname);
+                    if (!database || !nickname) return null;
+                    
                     const appId = window.__app_id || 'default-app-id';
                     
-                    const playerDocRef = doc(database, `artifacts/${appId}/users/${uid}/player_profile`, 'score_document');
-                    
                     try {
+                        // Check if nickname exists in the players collection
+                        const playerDocRef = doc(database, `artifacts/${appId}/players`, nickname);
                         const playerDoc = await getDoc(playerDocRef);
+                        
                         if (playerDoc.exists()) {
                             const data = playerDoc.data();
-                            gameState.score = data.score || 0;
-                            gameState.player.name = data.nickname || "Player";
-                            
-                            document.getElementById('nickname-input').value = gameState.player.name;
-                            document.getElementById('game-status').innerHTML = `Welcome back, <strong>${gameState.player.name}</strong>! Your total score is ${gameState.score}.`;
-                            console.log("Player data loaded from Firestore:", gameState.player.name, gameState.score);
+                            console.log("Found existing player:", nickname, "Score:", data.score);
+                            return {
+                                nickname: nickname,
+                                score: data.score || 0,
+                                lastPlayed: data.lastPlayed,
+                                gamesPlayed: data.gamesPlayed || 0
+                            };
                         } else {
-                            gameState.score = 0;
-                            gameState.player.name = "";
-                            document.getElementById('game-status').textContent = "Enter your nickname to start.";
-                            console.log("No existing player data found");
+                            console.log("New player:", nickname);
+                            return null;
                         }
                     } catch (e) {
                         console.error("Error loading player data:", e);
+                        return null;
                     }
                 }
 
-                // Nickname search and suggestion functionality
+                // Nickname search functionality (updated for new structure)
                 async function searchExistingNicknames(searchTerm, database) {
                     if (!database || !searchTerm.trim()) return [];
                     
                     const appId = window.__app_id || 'default-app-id';
-                    const scoresColRef = collection(database, `artifacts/${appId}/public/data/leaderboard_scores`);
+                    const playersColRef = collection(database, `artifacts/${appId}/players`);
                     
                     try {
-                        const querySnapshot = await getDocs(scoresColRef);
+                        const querySnapshot = await getDocs(playersColRef);
                         const matches = [];
                         const searchLower = searchTerm.toLowerCase().trim();
                         
                         querySnapshot.forEach((doc) => {
+                            const nickname = doc.id; // Document ID is the nickname
                             const data = doc.data();
-                            if (data.nickname) {
-                                const nicknameLower = data.nickname.toLowerCase();
-                                // Exact match (case insensitive)
-                                if (nicknameLower === searchLower) {
-                                    matches.push({
-                                        nickname: data.nickname,
-                                        score: data.score || 0,
-                                        exact: true,
-                                        userId: doc.id
-                                    });
-                                }
-                                // Partial match (contains search term)
-                                else if (nicknameLower.includes(searchLower)) {
-                                    matches.push({
-                                        nickname: data.nickname,
-                                        score: data.score || 0,
-                                        exact: false,
-                                        userId: doc.id
-                                    });
-                                }
+                            const nicknameLower = nickname.toLowerCase();
+                            
+                            // Exact match (case insensitive)
+                            if (nicknameLower === searchLower) {
+                                matches.push({
+                                    nickname: nickname,
+                                    score: data.score || 0,
+                                    exact: true,
+                                    gamesPlayed: data.gamesPlayed || 0
+                                });
+                            }
+                            // Partial match (contains search term)
+                            else if (nicknameLower.includes(searchLower)) {
+                                matches.push({
+                                    nickname: nickname,
+                                    score: data.score || 0,
+                                    exact: false,
+                                    gamesPlayed: data.gamesPlayed || 0
+                                });
                             }
                         });
                         
@@ -441,23 +453,24 @@
                     if (!database) return;
                     
                     const appId = window.__app_id || 'default-app-id';
-                    const scoresColRef = collection(database, `artifacts/${appId}/public/data/leaderboard_scores`);
-                    const q = query(scoresColRef);
+                    const playersColRef = collection(database, `artifacts/${appId}/players`);
 
-                    onSnapshot(q, (snapshot) => {
+                    onSnapshot(playersColRef, (snapshot) => {
                         const scores = [];
                         snapshot.forEach((doc) => {
+                            const nickname = doc.id; // Document ID is the nickname
                             const data = doc.data();
                             scores.push({
-                                id: doc.id,
-                                name: data.nickname,
-                                score: data.score
+                                id: nickname,
+                                name: nickname,
+                                score: data.score || 0,
+                                gamesPlayed: data.gamesPlayed || 0
                             });
                         });
                         
                         scores.sort((a, b) => b.score - a.score);
                         gameState.leaderboardScores = scores;
-                        console.log(`Leaderboard updated: ${scores.length} scores`);
+                        console.log(`Leaderboard updated: ${scores.length} players`);
                         
                         if (document.getElementById('end-game-popup').classList.contains('active-modal')) {
                             renderLeaderboard(scores);
@@ -470,36 +483,46 @@
                 // Expose Firebase functions to global scope
                 window.saveScore = async function() {
                     console.log("Saving score to Firebase...");
-                    if (!isFirebaseReady || !userId) {
-                        console.warn("Firebase not ready. Score not saved.");
+                    if (!isFirebaseReady || !gameState.player.name) {
+                        console.warn("Firebase not ready or no player name. Score not saved.");
                         return;
                     }
                     
                     const appId = window.__app_id || 'default-app-id';
-                    const playerDocRef = doc(db, `artifacts/${appId}/users/${userId}/player_profile`, 'score_document');
+                    const nickname = gameState.player.name;
                     
-                    const newScoreData = {
-                        nickname: gameState.player.name,
+                    // Use nickname as document ID for unique constraint
+                    const playerDocRef = doc(db, `artifacts/${appId}/players`, nickname);
+                    
+                    // Get current data to increment games played
+                    let currentGamesPlayed = 0;
+                    try {
+                        const currentDoc = await getDoc(playerDocRef);
+                        if (currentDoc.exists()) {
+                            currentGamesPlayed = currentDoc.data().gamesPlayed || 0;
+                        }
+                    } catch (e) {
+                        console.log("No existing player data, starting fresh");
+                    }
+
+                    const playerData = {
                         score: gameState.score,
-                        lastPlayed: new Date().toISOString()
+                        lastPlayed: new Date().toISOString(),
+                        gamesPlayed: currentGamesPlayed + 1,
+                        nickname: nickname // Store for redundancy
                     };
 
                     try {
-                        await setDoc(playerDocRef, newScoreData, { merge: true });
-                        console.log("Score saved to private profile");
-
-                        // Update public leaderboard
-                        const publicDocRef = doc(db, `artifacts/${appId}/public/data/leaderboard_scores`, userId);
-                        const publicData = {
-                            nickname: gameState.player.name,
-                            score: gameState.score,
-                            lastUpdated: new Date().toISOString()
-                        };
-                        
-                        await setDoc(publicDocRef, publicData, { merge: true });
-                        console.log("Public leaderboard updated");
+                        await setDoc(playerDocRef, playerData);
+                        console.log("Player data saved:", nickname, "Score:", gameState.score);
                     } catch (e) {
-                        console.error("Error saving score:", e);
+                        console.error("Error saving player data:", e);
+                        
+                        // If nickname contains invalid characters for Firestore doc ID
+                        if (e.code === 'invalid-argument') {
+                            console.error("Nickname contains invalid characters for database storage");
+                            alert("Your nickname contains characters that cannot be saved. Please use only letters, numbers, and basic punctuation.");
+                        }
                     }
                 };
 
@@ -773,6 +796,13 @@
                 return;
             }
 
+            // Validate nickname for Firestore compatibility
+            const validNicknamePattern = /^[a-zA-Z0-9._-]+$/;
+            if (!validNicknamePattern.test(nickname)) {
+                document.getElementById('game-status').textContent = "Nickname can only contain letters, numbers, dots, underscores, and hyphens.";
+                return;
+            }
+
             // Remove any remaining suggestions
             const suggestions = document.getElementById('nickname-suggestions');
             if (suggestions) suggestions.remove();
@@ -792,25 +822,35 @@
                 window.authInitialized = true;
             }
 
-            // Check if this nickname exists in database for a different user
-            if (window.searchNicknames) {
-                const existingMatches = await window.searchNicknames(nickname, window.db || null);
-                const exactMatch = existingMatches.find(match => 
-                    match.exact && match.nickname.toLowerCase() === nickname.toLowerCase()
-                );
-                
-                if (exactMatch) {
-                    // If exact match found, use their score as starting reference
-                    gameState.player.name = exactMatch.nickname; // Use the exact case from database
-                    console.log(`Found existing nickname: ${exactMatch.nickname} with score: ${exactMatch.score}`);
+            // Load player data by nickname (new approach)
+            if (window.loadPlayerDataByNickname) {
+                const playerData = await window.loadPlayerDataByNickname(nickname, window.db || null);
+                if (playerData) {
+                    gameState.player.name = playerData.nickname;
+                    gameState.score = playerData.score;
+                    console.log(`Loaded existing player: ${playerData.nickname} with score: ${playerData.score}`);
                 } else {
-                    // New nickname - will create new entry
+                    // New player
                     gameState.player.name = nickname;
-                    console.log(`Creating new profile for nickname: ${nickname}`);
+                    gameState.score = 0;
+                    console.log(`New player: ${nickname}`);
                 }
             } else {
                 // Fallback for offline mode
                 gameState.player.name = nickname;
+                
+                // Load from localStorage for offline mode
+                const savedData = localStorage.getItem('phishing-defense-data');
+                if (savedData) {
+                    try {
+                        const parsed = JSON.parse(savedData);
+                        if (parsed.name === nickname) {
+                            gameState.score = parsed.score || 0;
+                        }
+                    } catch (e) {
+                        console.error("Error loading offline data:", e);
+                    }
+                }
             }
             
             // Reset button state
