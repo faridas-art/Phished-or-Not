@@ -1,4 +1,4 @@
-<!DOCTYPE ahtml>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -63,7 +63,7 @@
             
             <div id="auth-status" class="flex flex-col items-center justify-center mb-6">
                 <div id="loading-spinner" class="loader mb-2"></div>
-                <p id="loading-message" class="text-gray-500">Connecting to database...</p>
+                <p id="loading-message" class="text-gray-500">Checking connection...</p>
                 <p id="user-info" class="text-xs text-gray-500 mt-2 hidden"></p>
             </div>
 
@@ -134,45 +134,286 @@
     <!-- URL Tooltip to show on link hover -->
     <div id="url-tooltip" class="hidden"></div>
 
-    <!-- Firebase Imports and Game Script -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, 
-            signInAnonymously, 
-            signInWithCustomToken, 
-            onAuthStateChanged 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            doc, 
-            getDoc, 
-            setDoc, 
-            onSnapshot, 
-            collection, 
-            query
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-
-        // --- Firebase Globals and State ---
-        let db;
-        let auth;
-        let userId = null;
-        let isFirebaseReady = false;
-        let isAuthListenerInitialized = false; // Flag to ensure initialization runs only once
+        // --- Configuration Check ---
+        console.log("Starting Firebase initialization...");
         
-        // --- Game State (Now depends on Firebase) ---
+        // Check for required configuration variables
+        const requiredVars = ['__firebase_config', '__app_id'];
+        const missingVars = requiredVars.filter(varName => typeof window[varName] === 'undefined' || window[varName] === '');
+        
+        if (missingVars.length > 0) {
+            console.warn(`Missing configuration variables: ${missingVars.join(', ')}`);
+            console.log("Running in offline mode - scores will not be saved");
+            initializeOfflineMode();
+        } else {
+            console.log("Configuration found, attempting Firebase connection...");
+            initializeFirebaseMode();
+        }
+
+        // --- Firebase Mode ---
+        async function initializeFirebaseMode() {
+            try {
+                const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+                const { 
+                    getAuth, 
+                    signInAnonymously, 
+                    signInWithCustomToken, 
+                    onAuthStateChanged 
+                } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                const { 
+                    getFirestore, 
+                    doc, 
+                    getDoc, 
+                    setDoc, 
+                    onSnapshot, 
+                    collection, 
+                    query
+                } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+
+                let db, auth, userId = null;
+                let isFirebaseReady = false;
+                let isAuthListenerInitialized = false;
+
+                console.log("Firebase modules loaded successfully");
+
+                // Parse configuration
+                let firebaseConfig;
+                try {
+                    firebaseConfig = typeof window.__firebase_config === 'string' ? 
+                        JSON.parse(window.__firebase_config) : window.__firebase_config;
+                } catch (e) {
+                    console.error("Failed to parse Firebase config:", e);
+                    throw new Error("Invalid Firebase Configuration");
+                }
+
+                console.log("Firebase config parsed:", Object.keys(firebaseConfig));
+
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                console.log("Firebase app initialized");
+
+                const initialAuthToken = window.__initial_auth_token || null;
+
+                // Set up authentication listener
+                onAuthStateChanged(auth, async (user) => {
+                    console.log("Auth state changed:", user ? 'User signed in' : 'No user');
+                    
+                    if (!user) {
+                        console.log("Attempting authentication...");
+                        if (initialAuthToken) {
+                            try {
+                                await signInWithCustomToken(auth, initialAuthToken);
+                                console.log("Custom token sign-in successful");
+                            } catch (e) {
+                                console.error("Custom token sign-in failed:", e);
+                                await signInAnonymously(auth);
+                                console.log("Anonymous sign-in successful");
+                            }
+                        } else {
+                            await signInAnonymously(auth);
+                            console.log("Anonymous sign-in successful");
+                        }
+                        return;
+                    }
+                    
+                    if (user && !isAuthListenerInitialized) {
+                        console.log("Initializing game with authenticated user");
+                        isAuthListenerInitialized = true;
+                        userId = user.uid;
+
+                        await loadPlayerData(userId, db);
+                        isFirebaseReady = true;
+                        listenForScores(db);
+                        
+                        updateUI('firebase', userId);
+                    }
+                });
+
+                // Firebase-specific functions
+                async function loadPlayerData(uid, database) {
+                    if (!database || !uid) return;
+                    const appId = window.__app_id || 'default-app-id';
+                    
+                    const playerDocRef = doc(database, `artifacts/${appId}/users/${uid}/player_profile`, 'score_document');
+                    
+                    try {
+                        const playerDoc = await getDoc(playerDocRef);
+                        if (playerDoc.exists()) {
+                            const data = playerDoc.data();
+                            gameState.score = data.score || 0;
+                            gameState.player.name = data.nickname || "Player";
+                            
+                            document.getElementById('nickname-input').value = gameState.player.name;
+                            document.getElementById('game-status').innerHTML = `Welcome back, <strong>${gameState.player.name}</strong>! Your total score is ${gameState.score}.`;
+                        } else {
+                            gameState.score = 0;
+                            gameState.player.name = "";
+                            document.getElementById('game-status').textContent = "Enter your nickname to start.";
+                        }
+                        console.log("Player data loaded:", gameState.player.name, gameState.score);
+                    } catch (e) {
+                        console.error("Error loading player data:", e);
+                    }
+                }
+
+                function listenForScores(database) {
+                    if (!database) return;
+                    
+                    const appId = window.__app_id || 'default-app-id';
+                    const scoresColRef = collection(database, `artifacts/${appId}/public/data/leaderboard_scores`);
+                    const q = query(scoresColRef);
+
+                    onSnapshot(q, (snapshot) => {
+                        const scores = [];
+                        snapshot.forEach((doc) => {
+                            const data = doc.data();
+                            scores.push({
+                                id: doc.id,
+                                name: data.nickname,
+                                score: data.score
+                            });
+                        });
+                        
+                        scores.sort((a, b) => b.score - a.score);
+                        gameState.leaderboardScores = scores;
+                        console.log(`Leaderboard updated: ${scores.length} scores`);
+                        
+                        if (document.getElementById('end-game-popup').classList.contains('active-modal')) {
+                            renderLeaderboard(scores);
+                        }
+                    }, (error) => {
+                        console.error("Error listening to leaderboard:", error);
+                    });
+                }
+
+                // Expose Firebase functions to global scope
+                window.saveScore = async function() {
+                    if (!isFirebaseReady || !userId) {
+                        console.warn("Firebase not ready. Score not saved.");
+                        return;
+                    }
+                    
+                    const appId = window.__app_id || 'default-app-id';
+                    const playerDocRef = doc(db, `artifacts/${appId}/users/${userId}/player_profile`, 'score_document');
+                    
+                    const newScoreData = {
+                        nickname: gameState.player.name,
+                        score: gameState.score,
+                        lastPlayed: new Date().toISOString()
+                    };
+
+                    try {
+                        await setDoc(playerDocRef, newScoreData, { merge: true });
+                        console.log("Score saved to private profile");
+
+                        // Update public leaderboard
+                        const publicDocRef = doc(db, `artifacts/${appId}/public/data/leaderboard_scores`, userId);
+                        const publicData = {
+                            nickname: gameState.player.name,
+                            score: gameState.score,
+                            lastUpdated: new Date().toISOString()
+                        };
+                        
+                        await setDoc(publicDocRef, publicData, { merge: true });
+                        console.log("Public leaderboard updated");
+                    } catch (e) {
+                        console.error("Error saving score:", e);
+                    }
+                };
+
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                console.log("Falling back to offline mode");
+                initializeOfflineMode();
+            }
+        }
+
+        // --- Offline Mode ---
+        function initializeOfflineMode() {
+            console.log("Initializing offline mode");
+            
+            // Load from localStorage if available
+            const savedData = localStorage.getItem('phishing-defense-data');
+            if (savedData) {
+                try {
+                    const parsed = JSON.parse(savedData);
+                    gameState.score = parsed.score || 0;
+                    gameState.player.name = parsed.name || "";
+                    gameState.leaderboardScores = parsed.leaderboard || [];
+                } catch (e) {
+                    console.error("Error parsing saved data:", e);
+                }
+            }
+
+            // Mock save function for offline mode
+            window.saveScore = async function() {
+                console.log("Saving score locally");
+                const dataToSave = {
+                    score: gameState.score,
+                    name: gameState.player.name,
+                    leaderboard: gameState.leaderboardScores,
+                    lastPlayed: new Date().toISOString()
+                };
+                
+                try {
+                    localStorage.setItem('phishing-defense-data', JSON.stringify(dataToSave));
+                    
+                    // Update local leaderboard
+                    const existingPlayerIndex = gameState.leaderboardScores.findIndex(p => p.name === gameState.player.name);
+                    if (existingPlayerIndex >= 0) {
+                        gameState.leaderboardScores[existingPlayerIndex].score = gameState.score;
+                    } else {
+                        gameState.leaderboardScores.push({
+                            id: 'local-' + Date.now(),
+                            name: gameState.player.name,
+                            score: gameState.score
+                        });
+                    }
+                    
+                    gameState.leaderboardScores.sort((a, b) => b.score - a.score);
+                } catch (e) {
+                    console.error("Error saving to localStorage:", e);
+                }
+            };
+
+            updateUI('offline');
+        }
+
+        // --- UI Update Function ---
+        function updateUI(mode, userId = null) {
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const loadingMessage = document.getElementById('loading-message');
+            const userInfoEl = document.getElementById('user-info');
+            const startGameBtn = document.getElementById('start-game-btn');
+
+            loadingSpinner.classList.add('hidden');
+            
+            if (mode === 'firebase') {
+                loadingMessage.textContent = "Connected! Scores will be saved.";
+                userInfoEl.textContent = `User ID: ${userId}`;
+                userInfoEl.classList.remove('hidden');
+            } else {
+                loadingMessage.textContent = "Playing offline - scores saved locally.";
+                userInfoEl.textContent = "Offline Mode";
+                userInfoEl.classList.remove('hidden');
+            }
+            
+            startGameBtn.disabled = false;
+        }
+
+        // --- Game State ---
         const gameState = {
             currentEmail: null,
-            score: 0, // Total career score from Firestore
-            sessionScore: 0, // Score for the current fixed session
-            currentEmailIndex: 0, 
+            score: 0,
+            sessionScore: 0,
+            currentEmailIndex: 0,
             emails: [],
             player: { name: "Player" },
-            leaderboardScores: [], // Real-time scores fetched from Firestore
+            leaderboardScores: [],
             
-            // Pre-defined set of phishing scenarios and safe emails (STATIC DATA)
             scenarios: [
                 {
                     id: 1,
@@ -217,300 +458,42 @@
             ],
         };
 
-        // --- DOM elements ---
-        const startScreen = document.getElementById('start-screen');
-        const nicknameInput = document.getElementById('nickname-input');
-        const startGameBtn = document.getElementById('start-game-btn');
-        const gameStatus = document.getElementById('game-status');
-        const gameView = document.getElementById('game-view');
-        const emailContent = document.getElementById('email-content');
-        const playerScoreEl = document.getElementById('player-score');
-        const scoreTextEl = document.getElementById('score-text');
-        const scoreDisplayEl = document.getElementById('score-display');
-        const feedbackPopup = document.getElementById('feedback-popup');
-        const feedbackTitle = document.getElementById('feedback-title');
-        const feedbackMessage = document.getElementById('feedback-message');
-        const nextBtn = document.getElementById('next-btn');
-        const endGamePopup = document.getElementById('end-game-popup');
-        const endGameMessageEl = document.getElementById('end-game-message');
-        const scoresListEl = document.getElementById('leaderboard');
-        const playAgainBtn = document.getElementById('play-again-btn');
-        const quitGameBtn = document.getElementById('quit-game-btn');
-        const thankYouScreen = document.getElementById('thank-you-screen');
-        const thankYouPlayAgainBtn = document.getElementById('thank-you-play-again-btn');
-        const urlTooltip = document.getElementById('url-tooltip');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const loadingMessage = document.getElementById('loading-message');
-        const userInfoEl = document.getElementById('user-info');
-        const playerNicknameHeaderEl = document.getElementById('player-nickname-header'); 
-        
-        // --- Utility Functions ---
-        
-        // Utility function to shuffle array
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-            return array;
-        }
-
-        // --- Firebase/Data Functions ---
-
-        async function initializeFirebase() {
-            try {
-                // Set Firestore logging to debug mode
-                setLogLevel('Debug'); 
-                
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                let firebaseConfig;
-
-                // --- Robust check for config parsing error ---
-                if (typeof __firebase_config === 'string' && __firebase_config.length > 0) {
-                     try {
-                        firebaseConfig = JSON.parse(__firebase_config);
-                     } catch (e) {
-                         console.error("Failed to parse __firebase_config:", e);
-                         throw new Error("Invalid Firebase Configuration.");
-                     }
-                } else {
-                     throw new Error("Missing or empty Firebase Configuration string.");
-                }
-
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-
-                // 1. Set up the primary auth listener and initialize app state once ready
-                // This listener will be the SOLE entry point for game initialization, preventing race conditions.
-                onAuthStateChanged(auth, async (user) => {
-                    
-                    // --- Step 1: Authentication Handler ---
-                    if (!user) {
-                        // Case A: No user yet. Try to authenticate.
-                        
-                        if (initialAuthToken) {
-                            // 1. Try custom token sign-in (if token is available)
-                            console.log("No user found. Attempting sign-in with custom token.");
-                            await signInWithCustomToken(auth, initialAuthToken).catch(e => {
-                                console.error("Custom token sign-in failed. Falling back to anonymous.", e);
-                                // If token fails, fall back to anonymous sign-in
-                                signInAnonymously(auth).catch(err => console.error("Anonymous sign-in failed:", err));
-                            });
-                        } else {
-                            // 2. Fall back to anonymous sign-in
-                            console.log("No token or user found. Signing in anonymously.");
-                            await signInAnonymously(auth).catch(e => console.error("Anonymous sign-in failed:", e));
-                        }
-                        
-                        return; // Exit until the next auth state change (when a user is created/signed in)
-                    }
-                    
-                    // --- Step 2: Initialization Handler (User is now guaranteed to be authenticated) ---
-                    if (user && !isAuthListenerInitialized) {
-                        console.log("User authenticated. Initializing game state and data listeners.");
-                        isAuthListenerInitialized = true;
-                        userId = user.uid;
-
-                        // Proceed with data loading and listeners only once auth is confirmed
-                        await loadPlayerData(userId);
-                        
-                        isFirebaseReady = true;
-                        listenForScores(appId); 
-                        
-                        // Update UI state
-                        loadingSpinner.classList.add('hidden');
-                        loadingMessage.textContent = "Ready to play!";
-                        userInfoEl.textContent = `User ID: ${userId}`;
-                        userInfoEl.classList.remove('hidden');
-                        startGameBtn.disabled = false;
-                    }
-                });
-                
-            } catch (error) {
-                // This catch block handles errors from the explicit checks above (e.g., bad config) 
-                // and any general Firebase SDK initialization error.
-                console.error("Firebase Initialization Error:", error.message || error);
-                loadingSpinner.classList.add('hidden');
-                loadingMessage.textContent = "Scores will not be saved.";
-                startGameBtn.disabled = false; // Allow local play even if Firebase fails
-            }
-        }
-
-        async function loadPlayerData(uid) {
-            if (!db || !uid) return;
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            
-            // CRITICAL: Using the PRIVATE path for the user's score/profile data
-            const playerDocRef = doc(db, `artifacts/${appId}/users/${uid}/player_profile`, 'score_document');
-            
-            try {
-                const playerDoc = await getDoc(playerDocRef);
-                if (playerDoc.exists()) {
-                    const data = playerDoc.data();
-                    gameState.score = data.score || 0;
-                    gameState.player.name = data.nickname || "Player";
-                    
-                    // Suggest/pre-fill nickname
-                    nicknameInput.value = gameState.player.name;
-                    gameStatus.innerHTML = `Welcome back, **${gameState.player.name}**! Your total score is ${gameState.score}.`;
-                } else {
-                    // New player
-                    gameState.score = 0;
-                    gameState.player.name = ""; // Allow new name entry
-                    gameStatus.textContent = `Enter your nickname to start.`;
-                }
-            } catch (e) {
-                console.error("Error loading player data:", e);
-                // Keep playing even if load fails
-            }
-        }
-
-        function listenForScores(appId) {
-            if (!db) {
-                console.warn("Database is not initialized. Cannot listen for scores.");
-                return;
-            }
-            // This still uses the public path for the global leaderboard display
-            const scoresColRef = collection(db, `artifacts/${appId}/public/data/leaderboard_scores`);
-            
-            // Query without limit to ensure all scores are fetched, mitigating potential query constraints
-            const q = query(scoresColRef);
-
-            // Setting up the real-time listener
-            onSnapshot(q, (snapshot) => {
-                const scores = [];
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    scores.push({
-                        id: doc.id,
-                        name: data.nickname,
-                        score: data.score
-                    });
-                });
-                console.log(`Leaderboard updated. Total scores received: ${scores.length}`);
-                
-                // Sort the scores locally
-                scores.sort((a, b) => b.score - a.score);
-                gameState.leaderboardScores = scores;
-                
-                // If the game is over, re-render the leaderboard
-                if (endGamePopup.classList.contains('active-modal')) {
-                     renderLeaderboard(scores);
-                }
-            }, (error) => {
-                // This is the error handler that was logging the permission error
-                console.error("Error listening to leaderboard:", error);
-            });
-        }
-
-        async function updatePublicLeaderboard() {
-            if (!isFirebaseReady || !userId) return;
-
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            // Public path for global leaderboard display (Read/Write for all authenticated users)
-            const publicDocRef = doc(db, `artifacts/${appId}/public/data/leaderboard_scores`, userId);
-            
-            console.log(`Attempting to update public leaderboard at path: artifacts/${appId}/public/data/leaderboard_scores/${userId}`);
-            
-            const publicData = {
-                nickname: gameState.player.name,
-                score: gameState.score, // Total career score
-                lastUpdated: new Date().toISOString()
-            };
-            
-            try {
-                // Use setDoc to create or overwrite the document for the unique userId
-                await setDoc(publicDocRef, publicData, { merge: true });
-                console.log("Public leaderboard updated.");
-            } catch (e) {
-                console.error("Error updating public leaderboard:", e);
-            }
-        }
-
-        async function saveScore() {
-            if (!isFirebaseReady || !userId) {
-                console.warn("Firebase not ready or user not authenticated. Score not saved.");
-                return;
-            }
-            
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            // CRITICAL: Use the PRIVATE path for the user's score/profile data first
-            const playerDocRef = doc(db, `artifacts/${appId}/users/${userId}/player_profile`, 'score_document');
-            
-            const newScoreData = {
-                nickname: gameState.player.name,
-                score: gameState.score, // Total career score
-                lastPlayed: new Date().toISOString()
-            };
-
-            try {
-                // 1. Save core data to secure private path
-                await setDoc(playerDocRef, newScoreData, { merge: true });
-                console.log("Score and Nickname saved successfully to private profile.");
-
-                // 2. Update public leaderboard cache
-                await updatePublicLeaderboard();
-
-            } catch (e) {
-                console.error("Error saving score to private profile:", e);
-            }
-        }
-
-        function renderLeaderboard(scores) {
-            scoresListEl.innerHTML = '';
-            
-            if (scores.length === 0) {
-                scoresListEl.innerHTML = '<li class="text-gray-500">No scores yet. Be the first!</li>';
-                return;
-            }
-
-            scores.slice(0, 10).forEach(item => { // Show top 10
-                const isPlayer = item.id === userId;
-                const listItem = document.createElement('li');
-                // Use indigo for the current player highlight
-                listItem.className = `flex justify-between items-center text-gray-700 px-4 py-2 rounded-lg ${isPlayer ? 'bg-indigo-100 font-semibold border-2 border-indigo-400' : ''}`;
-                listItem.innerHTML = `
-                    <span class="truncate">${item.name} ${isPlayer ? '(You)' : ''}</span>
-                    <span class="font-bold text-lg">${item.score}</span>
-                `;
-                scoresListEl.appendChild(listItem);
-            });
-        }
-        
         // --- Game Logic Functions ---
-        
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
         async function startGame() {
-            const nickname = nicknameInput.value.trim();
+            const nickname = document.getElementById('nickname-input').value.trim();
             if (nickname === "") {
-                gameStatus.textContent = "Please enter a nickname to start.";
+                document.getElementById('game-status').textContent = "Please enter a nickname to start.";
                 return;
             }
             gameState.player.name = nickname;
             
-            // Set friendly nickname header in game view
-            playerNicknameHeaderEl.textContent = `Hello, ${gameState.player.name}! Defend the inbox.`;
-            playerNicknameHeaderEl.classList.remove('hidden');
+            document.getElementById('player-nickname-header').textContent = `Hello, ${gameState.player.name}! Defend the inbox.`;
+            document.getElementById('player-nickname-header').classList.remove('hidden');
 
-            // Reset session-specific game state
             gameState.sessionScore = 0;
             gameState.currentEmailIndex = 0;
-            gameState.emails = shuffleArray([...gameState.scenarios]); 
+            gameState.emails = shuffleArray(gameState.scenarios);
 
-            startScreen.classList.add('hidden');
-            thankYouScreen.classList.add('hidden');
-            gameView.classList.remove('hidden');
-            scoreDisplayEl.classList.remove('hidden');
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('thank-you-screen').classList.add('hidden');
+            document.getElementById('game-view').classList.remove('hidden');
+            document.getElementById('score-display').classList.remove('hidden');
             
-            // Start rendering the first email
             renderEmail(gameState.emails[gameState.currentEmailIndex]);
             updateSessionScoreDisplay();
         }
 
         function renderEmail(email) {
+            const emailContent = document.getElementById('email-content');
             emailContent.classList.remove('justify-center', 'items-center');
 
             const escapedSender = email.sender
@@ -520,17 +503,17 @@
             emailContent.innerHTML = `
                 <div class="mb-4 overflow-x-auto">
                     <h2 class="text-xl md:text-2xl font-semibold text-gray-800 mb-1">${email.subject}</h2>
-                    <p class="text-gray-500 text-sm" data-full-sender="${escapedSender}">From: <span class="font-medium text-gray-700">${escapedSender}</span></p>
+                    <p class="text-gray-500 text-sm">From: <span class="font-medium text-gray-700">${escapedSender}</span></p>
                 </div>
                 <div class="prose max-w-none text-gray-700 mb-6">
                     ${email.body}
                 </div>
                 <div id="action-buttons" class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 w-full">
                     <button id="safe-btn" class="w-full px-6 py-3 bg-green-500 text-white font-semibold rounded-lg shadow-lg hover:bg-green-600 transition-colors duration-300">
-                        <i class="fas fa-check-circle mr-2"></i> Safe
+                        ✓ Safe
                     </button>
                     <button id="phish-btn" class="w-full px-6 py-3 bg-red-500 text-white font-semibold rounded-lg shadow-lg hover:bg-red-600 transition-colors duration-300">
-                        <i class="fas fa-exclamation-triangle mr-2"></i> Spam
+                        ⚠ Spam
                     </button>
                 </div>
             `;
@@ -539,6 +522,8 @@
             document.getElementById('phish-btn').addEventListener('click', () => handleAnswer(true, email));
             
             const links = emailContent.querySelectorAll('a');
+            const urlTooltip = document.getElementById('url-tooltip');
+            
             links.forEach(link => {
                 link.addEventListener('mouseover', (e) => {
                     const href = e.target.getAttribute('href');
@@ -559,10 +544,8 @@
             const isCorrect = (isUserPhish === email.isPhishing);
             const scoreChange = isCorrect ? 1 : 0;
             
-            // Only update session score here
-            gameState.sessionScore += scoreChange; 
-            
-            updateSessionScoreDisplay(); 
+            gameState.sessionScore += scoreChange;
+            updateSessionScoreDisplay();
             showFeedback(isCorrect, email);
 
             document.getElementById('safe-btn').disabled = true;
@@ -576,30 +559,28 @@
 
             if (isCorrect) {
                 message = email.isPhishing
-                    ? `**Great job!** You correctly spotted the scam.`
-                    : `**Excellent!** This was a safe and legitimate message.`;
+                    ? `<strong>Great job!</strong> You correctly spotted the scam.`
+                    : `<strong>Excellent!</strong> This was a safe and legitimate message.`;
             } else {
-                // If incorrect, provide the reason (the red flags)
                 message = email.isPhishing
                     ? "This was a phishing email. You should have reported it."
                     : "This was a safe email. Not every urgent email is a scam!";
                 
-                // Add the analysis block ONLY when the user is incorrect
                 message += "<div class='text-left mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 text-gray-700'><h4 class='font-bold mb-2'>Analysis:</h4><ul class='list-disc list-inside space-y-1'>" + email.redFlags.map(flag => `<li>${flag}</li>`).join('') + "</ul></div>";
             }
 
-            nextBtn.textContent = isLastEmail ? "View Final Score" : "Next Email";
-
-            feedbackTitle.textContent = title;
-            feedbackMessage.innerHTML = message;
-            feedbackPopup.classList.add('active-modal');
-            feedbackPopup.classList.remove('hidden');
+            document.getElementById('next-btn').textContent = isLastEmail ? "View Final Score" : "Next Email";
+            document.getElementById('feedback-title').textContent = title;
+            document.getElementById('feedback-message').innerHTML = message;
+            document.getElementById('feedback-popup').classList.add('active-modal');
+            document.getElementById('feedback-popup').classList.remove('hidden');
         }
 
         function nextEmail() {
-            feedbackPopup.classList.remove('active-modal');
-            feedbackPopup.classList.add('hidden');
+            document.getElementById('feedback-popup').classList.remove('active-modal');
+            document.getElementById('feedback-popup').classList.add('hidden');
             gameState.currentEmailIndex++;
+            
             if (gameState.currentEmailIndex < gameState.emails.length) {
                 renderEmail(gameState.emails[gameState.currentEmailIndex]);
                 updateSessionScoreDisplay();
@@ -609,22 +590,20 @@
         }
         
         async function endGame() {
-            gameView.classList.add('hidden');
-            endGamePopup.classList.add('active-modal');
-            endGamePopup.classList.remove('hidden');
+            document.getElementById('game-view').classList.add('hidden');
+            document.getElementById('end-game-popup').classList.add('active-modal');
+            document.getElementById('end-game-popup').classList.remove('hidden');
             
-            // Update TOTAL career score
             gameState.score += gameState.sessionScore;
             
-            // Save the new score
-            await saveScore(); 
+            if (window.saveScore) {
+                await window.saveScore();
+            }
 
             const sessionScore = gameState.sessionScore;
             const totalEmails = gameState.emails.length;
             
-            // Simplified, score-less message for end-game popup
             let finalMessage = "";
-
             if (sessionScore === totalEmails) {
                 finalMessage = `Perfect defense, ${gameState.player.name}!`;
             } else if (sessionScore >= totalEmails * 0.8) {
@@ -633,22 +612,20 @@
                 finalMessage = `Good effort, ${gameState.player.name}!`;
             }
 
-            endGameMessageEl.innerHTML = finalMessage;
-            
-            // Render the real-time scores fetched by the listener
+            document.getElementById('end-game-message').innerHTML = finalMessage;
             renderLeaderboard(gameState.leaderboardScores);
         }
 
         function showThankYouScreen() {
-            endGamePopup.classList.remove('active-modal');
-            endGamePopup.classList.add('hidden');
-            gameView.classList.add('hidden'); 
-            thankYouScreen.classList.remove('hidden');
+            document.getElementById('end-game-popup').classList.remove('active-modal');
+            document.getElementById('end-game-popup').classList.add('hidden');
+            document.getElementById('game-view').classList.add('hidden');
+            document.getElementById('thank-you-screen').classList.remove('hidden');
 
             const score = gameState.score;
             const name = gameState.player.name;
             let title = `Thanks for Playing, ${name}!`;
-           // let message = `Your total career score is **${score}**. Keep building that defense!`;
+            let message = `Your total career score is <strong>${score}</strong>. Keep building that defense!`;
 
             if (score > 15) {
                 title = `Cybersecurity Champion, ${name}!`;
@@ -664,40 +641,56 @@
             const totalEmails = gameState.emails.length;
             const currentEmailNumber = gameState.currentEmailIndex + 1;
             
-            scoreTextEl.textContent = `Email ${currentEmailNumber} of ${totalEmails}`;
-            playerScoreEl.textContent = `${gameState.sessionScore} / ${totalEmails}`;
+            document.getElementById('score-text').textContent = `Email ${currentEmailNumber} of ${totalEmails}`;
+            document.getElementById('player-score').textContent = `${gameState.sessionScore} / ${totalEmails}`;
+        }
+
+        function renderLeaderboard(scores) {
+            const scoresListEl = document.getElementById('leaderboard');
+            scoresListEl.innerHTML = '';
+            
+            if (scores.length === 0) {
+                scoresListEl.innerHTML = '<li class="text-gray-500">No scores yet. Be the first!</li>';
+                return;
+            }
+
+            scores.slice(0, 10).forEach(item => {
+                const isPlayer = item.name === gameState.player.name;
+                const listItem = document.createElement('li');
+                listItem.className = `flex justify-between items-center text-gray-700 px-4 py-2 rounded-lg ${isPlayer ? 'bg-indigo-100 font-semibold border-2 border-indigo-400' : ''}`;
+                listItem.innerHTML = `
+                    <span class="truncate">${item.name} ${isPlayer ? '(You)' : ''}</span>
+                    <span class="font-bold text-lg">${item.score}</span>
+                `;
+                scoresListEl.appendChild(listItem);
+            });
         }
         
         // --- Event Listeners ---
-        startGameBtn.addEventListener('click', startGame);
+        document.getElementById('start-game-btn').addEventListener('click', startGame);
 
-        nextBtn.addEventListener('click', () => {
+        document.getElementById('next-btn').addEventListener('click', () => {
              const isLastEmail = gameState.currentEmailIndex === gameState.emails.length - 1;
-
              if (isLastEmail) {
-                feedbackPopup.classList.remove('active-modal');
-                feedbackPopup.classList.add('hidden');
+                document.getElementById('feedback-popup').classList.remove('active-modal');
+                document.getElementById('feedback-popup').classList.add('hidden');
                 endGame();
              } else {
                 nextEmail(); 
              }
         });
 
-        playAgainBtn.addEventListener('click', () => {
-            endGamePopup.classList.remove('active-modal');
-            endGamePopup.classList.add('hidden');
-            // Re-load player data to get updated total score and name
-            loadPlayerData(userId).then(startGame); 
-        });
-        
-        quitGameBtn.addEventListener('click', showThankYouScreen);
-        
-        thankYouPlayAgainBtn.addEventListener('click', () => {
+        document.getElementById('play-again-btn').addEventListener('click', () => {
+            document.getElementById('end-game-popup').classList.remove('active-modal');
+            document.getElementById('end-game-popup').classList.add('hidden');
             startGame();
         });
         
-        // Initialize Firebase on load
-        initializeFirebase();
+        document.getElementById('quit-game-btn').addEventListener('click', showThankYouScreen);
+        
+        document.getElementById('thank-you-play-again-btn').addEventListener('click', () => {
+            startGame();
+        });
 
     </script>
 </body>
