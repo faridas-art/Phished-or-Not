@@ -181,7 +181,8 @@
                     getAuth, 
                     signInAnonymously, 
                     signInWithCustomToken, 
-                    onAuthStateChanged 
+                    onAuthStateChanged,
+                    signOut
                 } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
                 const { 
                     getFirestore, 
@@ -663,7 +664,7 @@
                 const exactMatch = existingMatches.find(match => 
                     match.exact && match.nickname.toLowerCase() === nickname.toLowerCase()
                 );
-                
+
                 if (exactMatch) {
                     // If exact match found, use their score as starting reference
                     gameState.player.name = exactMatch.nickname; // Use the exact case from database
