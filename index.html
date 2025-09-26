@@ -355,8 +355,9 @@
         function listenForScores(appId) {
             // This still uses the public path for the global leaderboard display
             const scoresColRef = collection(db, `artifacts/${appId}/public/data/leaderboard_scores`);
-            // Querying without orderBy, will sort client-side
-            const q = query(scoresColRef, limit(10));
+            
+            // Removed limit(10) to increase robustness against potential query/indexing issues
+            const q = query(scoresColRef);
 
             // Setting up the real-time listener
             onSnapshot(q, (snapshot) => {
@@ -369,6 +370,8 @@
                         score: data.score
                     });
                 });
+                console.log(`Leaderboard updated. Total scores received: ${scores.length}`);
+                
                 // Sort the scores locally
                 scores.sort((a, b) => b.score - a.score);
                 gameState.leaderboardScores = scores;
@@ -389,6 +392,8 @@
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
             // Public path for global leaderboard display (Read/Write for all authenticated users)
             const publicDocRef = doc(db, `artifacts/${appId}/public/data/leaderboard_scores`, userId);
+            
+            console.log(`Attempting to update public leaderboard at path: artifacts/${appId}/public/data/leaderboard_scores/${userId}`);
             
             const publicData = {
                 nickname: gameState.player.name,
