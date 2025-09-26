@@ -176,9 +176,7 @@
 
     <script type="module">
         // --- Configuration Check ---
-        console.log("Starting Firebase initialization...");
-        console.log("Available config:", !!window.__firebase_config);
-        console.log("Available app_id:", !!window.__app_id);
+        console.log("Game loaded - Firebase will connect when user starts playing");
         
         // Check for required configuration variables
         const requiredVars = ['__firebase_config', '__app_id'];
@@ -186,14 +184,46 @@
         
         if (missingVars.length > 0) {
             console.warn(`Missing configuration variables: ${missingVars.join(', ')}`);
-            console.log("Running in offline mode - scores will not be saved");
-            initializeOfflineMode();
+            console.log("Will run in offline mode when game starts");
+            window.useOfflineMode = true;
         } else {
-            console.log("Configuration found, attempting Firebase connection...");
-            initializeFirebaseMode();
+            console.log("Firebase configuration found - will connect when game starts");
+            window.useOfflineMode = false;
         }
+        
+        // Initialize UI without authentication
+        initializeUIOnly();
 
-        // --- Firebase Mode ---
+        // --- UI Only Initialization (No Auth) ---
+        function initializeUIOnly() {
+            console.log("Initializing UI without authentication");
+            
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const loadingMessage = document.getElementById('loading-message');
+            const userInfoEl = document.getElementById('user-info');
+            const startGameBtn = document.getElementById('start-game-btn');
+
+            loadingSpinner.classList.add('hidden');
+            loadingMessage.textContent = "Ready to play! Enter your nickname to start.";
+            loadingMessage.className = "text-indigo-600";
+            userInfoEl.textContent = "Authentication will happen when you start playing";
+            userInfoEl.classList.remove('hidden');
+            startGameBtn.disabled = false;
+            
+            // Load any locally saved data for display
+            const savedData = localStorage.getItem('phishing-defense-data');
+            if (savedData) {
+                try {
+                    const parsed = JSON.parse(savedData);
+                    if (parsed.name) {
+                        document.getElementById('nickname-input').value = parsed.name;
+                        document.getElementById('game-status').innerHTML = `Welcome back, <strong>${parsed.name}</strong>! Your last score was ${parsed.score || 0}.`;
+                    }
+                } catch (e) {
+                    console.error("Error parsing saved data:", e);
+                }
+            }
+        }
         async function initializeFirebaseMode() {
             try {
                 console.log("Loading Firebase modules...");
@@ -622,6 +652,11 @@
             document.getElementById('nickname-input').value = "";
             document.getElementById('game-status').textContent = "Enter your nickname to start.";
             
+            // Reset button state
+            const startBtn = document.getElementById('start-game-btn');
+            startBtn.disabled = false;
+            startBtn.textContent = "Start Game";
+            
             // Remove nickname suggestions if any
             const suggestions = document.getElementById('nickname-suggestions');
             if (suggestions) suggestions.remove();
@@ -671,6 +706,9 @@
                 
                 if (value.length < 2) return;
                 
+                // Only search if Firebase is already initialized
+                if (!window.searchNicknames || !window.authInitialized) return;
+                
                 // Debounce search
                 clearTimeout(searchTimeout);
                 searchTimeout = setTimeout(async () => {
@@ -710,6 +748,21 @@
             // Remove any remaining suggestions
             const suggestions = document.getElementById('nickname-suggestions');
             if (suggestions) suggestions.remove();
+            
+            // Show loading state
+            const startBtn = document.getElementById('start-game-btn');
+            startBtn.disabled = true;
+            startBtn.textContent = "Connecting...";
+
+            // Initialize authentication now that user wants to play
+            if (!window.authInitialized) {
+                if (window.useOfflineMode) {
+                    await initializeOfflineMode();
+                } else {
+                    await initializeFirebaseMode();
+                }
+                window.authInitialized = true;
+            }
 
             // Check if this nickname exists in database for a different user
             if (window.searchNicknames) {
@@ -731,6 +784,10 @@
                 // Fallback for offline mode
                 gameState.player.name = nickname;
             }
+            
+            // Reset button state
+            startBtn.disabled = false;
+            startBtn.textContent = "Start Game";
             
             document.getElementById('player-nickname-header').textContent = `Hello, ${gameState.player.name}! Defend the inbox.`;
             document.getElementById('player-nickname-header').classList.remove('hidden');
