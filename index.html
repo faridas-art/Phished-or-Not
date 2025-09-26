@@ -76,6 +76,9 @@
         
         <!-- Game View -->
         <div id="game-view" class="w-full h-full flex flex-col p-6 hidden">
+            <!-- Player Nickname Header (NEW ELEMENT) -->
+            <div id="player-nickname-header" class="text-lg font-semibold text-gray-700 mb-4 hidden"></div>
+            
             <div id="email-content" class="bg-white rounded-lg p-6 shadow-md border border-gray-200 flex-grow overflow-y-auto min-h-[500px] flex flex-col justify-center items-center">
                 <!-- Email content will be rendered here -->
             </div>
@@ -105,7 +108,7 @@
             <div class="bg-white p-8 rounded-xl shadow-xl max-w-lg w-full text-center">
                 <h3 class="text-2xl font-bold mb-4 text-gray-800">Game Over!</h3>
                 <p id="end-game-message" class="text-gray-600 text-lg mb-6"></p>
-                <h4 class="text-xl font-semibold text-gray-800 mt-6 mb-4">Top Scores (Cumulative)</h4>
+                <h4 class="text-xl font-semibold text-gray-800 mt-6 mb-4">Top Scores (Total Career Score)</h4>
                 <ul id="leaderboard" class="space-y-3">
                     <!-- Scores items will be rendered here by JS -->
                 </ul>
@@ -162,7 +165,7 @@
         // --- Game State (Now depends on Firebase) ---
         const gameState = {
             currentEmail: null,
-            score: 0, // Cumulative score from Firestore
+            score: 0, // Total career score from Firestore
             sessionScore: 0, // Score for the current fixed session
             currentEmailIndex: 0, 
             emails: [],
@@ -239,6 +242,7 @@
         const loadingSpinner = document.getElementById('loading-spinner');
         const loadingMessage = document.getElementById('loading-message');
         const userInfoEl = document.getElementById('user-info');
+        const playerNicknameHeaderEl = document.getElementById('player-nickname-header'); // NEW
         
         // --- Utility Functions ---
         
@@ -414,7 +418,7 @@
             
             const publicData = {
                 nickname: gameState.player.name,
-                score: gameState.score, // Cumulative score
+                score: gameState.score, // Total career score
                 lastUpdated: new Date().toISOString()
             };
             
@@ -439,7 +443,7 @@
             
             const newScoreData = {
                 nickname: gameState.player.name,
-                score: gameState.score, // Cumulative score
+                score: gameState.score, // Total career score
                 lastPlayed: new Date().toISOString()
             };
 
@@ -486,6 +490,10 @@
             }
             gameState.player.name = nickname;
             
+            // Set nickname header in game view
+            playerNicknameHeaderEl.textContent = `Logged in as: ${gameState.player.name}`;
+            playerNicknameHeaderEl.classList.remove('hidden');
+
             // Reset session-specific game state
             gameState.sessionScore = 0;
             gameState.currentEmailIndex = 0;
@@ -603,27 +611,26 @@
             endGamePopup.classList.add('active-modal');
             endGamePopup.classList.remove('hidden');
             
-            // Update CUMULATIVE score (this is the only place it changes)
+            // Update TOTAL career score
             gameState.score += gameState.sessionScore;
             
-            // Save the new cumulative score to Firestore
+            // Save the new score
             await saveScore(); 
 
             const sessionScore = gameState.sessionScore;
             const totalEmails = gameState.emails.length;
             
+            // Simplified message for end-game popup
             let finalMessage = "";
 
             if (sessionScore === totalEmails) {
-                finalMessage = `Perfect score! You scored **${sessionScore}/${totalEmails}** this round.`;
+                finalMessage = `Perfect defense, ${gameState.player.name}! You correctly identified all ${totalEmails} messages in this round.`;
             } else if (sessionScore >= totalEmails * 0.8) {
-                finalMessage = `Fantastic job! You scored **${sessionScore}/${totalEmails}** this round.`;
-            } else if (sessionScore >= totalEmails * 0.4) {
-                finalMessage = `Great work! You scored **${sessionScore}/${totalEmails}** this round.`;
+                finalMessage = `Strong defense, ${gameState.player.name}! You correctly identified ${sessionScore}/${totalEmails} messages this round.`;
             } else {
-                finalMessage = `Good try! You scored **${sessionScore}/${totalEmails}** this round.`;
+                finalMessage = `Well played, ${gameState.player.name}! You scored ${sessionScore}/${totalEmails} this round.`;
             }
-            finalMessage += `<br>Your new **TOTAL Career Score** is **${gameState.score}**.`;
+            // Removed: finalMessage += `<br>Your new **TOTAL Career Score** is **${gameState.score}**.`;
 
             endGameMessageEl.innerHTML = finalMessage;
             
@@ -638,13 +645,14 @@
             thankYouScreen.classList.remove('hidden');
 
             const score = gameState.score;
-            let title = "Thanks for Playing!";
+            const name = gameState.player.name;
+            let title = `Thanks for Playing, ${name}!`;
             let message = `Your total career score is **${score}**. Keep building that defense!`;
 
             if (score > 15) {
-                title = "Cybersecurity Champion!";
+                title = `Cybersecurity Champion, ${name}!`;
             } else if (score > 5) {
-                title = "Well Done!";
+                title = `Well Done, ${name}!`;
             }
 
             document.getElementById('thank-you-title').textContent = title;
@@ -677,7 +685,7 @@
         playAgainBtn.addEventListener('click', () => {
             endGamePopup.classList.remove('active-modal');
             endGamePopup.classList.add('hidden');
-            // Re-load player data to get updated cumulative score and name
+            // Re-load player data to get updated total score and name
             loadPlayerData(userId).then(startGame); 
         });
         
