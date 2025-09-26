@@ -699,7 +699,7 @@
             
             document.getElementById('pause-quit-popup').classList.add('hidden');
             
-            // NEW: Sign out the temporary anonymous user (resets session for next visit)
+            // NEW: Sign out the temporary anonymous user (resets session)
             if (window.logoutUser) {
                 await window.logoutUser();
             } else {
@@ -967,4 +967,156 @@
             updateSessionScoreDisplay();
             showFeedback(isCorrect, email);
 
-            document.getElementById('safe-btn
+            document.getElementById('safe-btn').disabled = true;
+            document.getElementById('phish-btn').disabled = true;
+        }
+
+        function showFeedback(isCorrect, email) {
+            const title = isCorrect ? "Correct!" : "Oops, Not Quite.";
+            let message = "";
+            const isLastEmail = gameState.currentEmailIndex === gameState.emails.length - 1;
+
+            if (isCorrect) {
+                message = email.isPhishing
+                    ? `<strong>Great job!</strong> You correctly spotted the scam.`
+                    : `<strong>Excellent!</strong> This was a safe and legitimate message.`;
+            } else {
+                message = email.isPhishing
+                    ? "This was a phishing email. You should have reported it."
+                    : "This was a safe email. Not every urgent email is a scam!";
+                
+                message += "<div class='text-left mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 text-gray-700'><h4 class='font-bold mb-2'>Analysis:</h4><ul class='list-disc list-inside space-y-1'>" + email.redFlags.map(flag => `<li>${flag}</li>`).join('') + "</ul></div>";
+            }
+
+            document.getElementById('next-btn').textContent = isLastEmail ? "View Final Score" : "Next Email";
+            document.getElementById('feedback-title').textContent = title;
+            document.getElementById('feedback-message').innerHTML = message;
+            document.getElementById('feedback-popup').classList.add('active-modal');
+            document.getElementById('feedback-popup').classList.remove('hidden');
+        }
+
+        function nextEmail() {
+            document.getElementById('feedback-popup').classList.remove('active-modal');
+            document.getElementById('feedback-popup').classList.add('hidden');
+            gameState.currentEmailIndex++;
+            
+            if (gameState.currentEmailIndex < gameState.emails.length) {
+                renderEmail(gameState.emails[gameState.currentEmailIndex]);
+                updateSessionScoreDisplay();
+            } else {
+                endGame();
+            }
+        }
+        
+        async function endGame() {
+            document.getElementById('game-view').classList.add('hidden');
+            document.getElementById('end-game-popup').classList.add('active-modal');
+            document.getElementById('end-game-popup').classList.remove('hidden');
+            
+            gameState.score += gameState.sessionScore;
+            
+            if (window.saveScore) {
+                await window.saveScore();
+            }
+
+            const sessionScore = gameState.sessionScore;
+            const totalEmails = gameState.emails.length;
+            
+            let finalMessage = "";
+            if (sessionScore === totalEmails) {
+                finalMessage = `Perfect defense, ${gameState.player.name}!`;
+            } else if (sessionScore >= totalEmails * 0.8) {
+                finalMessage = `Strong defense, ${gameState.player.name}!`;
+            } else {
+                finalMessage = `Good effort, ${gameState.player.name}!`;
+            }
+
+            document.getElementById('end-game-message').innerHTML = finalMessage;
+            renderLeaderboard(gameState.leaderboardScores);
+        }
+
+        function showThankYouScreen() {
+            document.getElementById('end-game-popup').classList.remove('active-modal');
+            document.getElementById('end-game-popup').classList.add('hidden');
+            document.getElementById('game-view').classList.add('hidden');
+            document.getElementById('thank-you-screen').classList.remove('hidden');
+
+            const score = gameState.score;
+            const name = gameState.player.name;
+            let title = `Thanks for Playing, ${name}!`;
+            let message = `Your total career score is <strong>${score}</strong>. Keep building that defense!`;
+
+            if (score > 15) {
+                title = `Cybersecurity Champion, ${name}!`;
+            } else if (score > 5) {
+                title = `Well Done, ${name}!`;
+            }
+
+            document.getElementById('thank-you-title').textContent = title;
+            document.getElementById('thank-you-message').innerHTML = message;
+        }
+        
+        function updateSessionScoreDisplay() {
+            const totalEmails = gameState.emails.length;
+            const currentEmailNumber = gameState.currentEmailIndex + 1;
+            
+            document.getElementById('score-text').textContent = `Email ${currentEmailNumber} of ${totalEmails}`;
+            document.getElementById('player-score').textContent = `${gameState.sessionScore} / ${totalEmails}`;
+        }
+
+        function renderLeaderboard(scores) {
+            const scoresListEl = document.getElementById('leaderboard');
+            scoresListEl.innerHTML = '';
+            
+            if (scores.length === 0) {
+                scoresListEl.innerHTML = '<li class="text-gray-500">No scores yet. Be the first!</li>';
+                return;
+            }
+
+            scores.slice(0, 10).forEach(item => {
+                const isPlayer = item.name === gameState.player.name;
+                const listItem = document.createElement('li');
+                listItem.className = `flex justify-between items-center text-gray-700 px-4 py-2 rounded-lg ${isPlayer ? 'bg-indigo-100 font-semibold border-2 border-indigo-400' : ''}`;
+                listItem.innerHTML = `
+                    <span class="truncate">${item.name} ${isPlayer ? '(You)' : ''}</span>
+                    <span class="font-bold text-lg">${item.score}</span>
+                `;
+                scoresListEl.appendChild(listItem);
+            });
+        }
+        
+        // --- Event Listeners ---
+        document.getElementById('start-game-btn').addEventListener('click', startGame);
+        document.getElementById('pause-quit-btn').addEventListener('click', pauseGame);
+        document.getElementById('resume-game-btn').addEventListener('click', resumeGame);
+        document.getElementById('save-quit-btn').addEventListener('click', saveAndQuit);
+
+        document.getElementById('next-btn').addEventListener('click', () => {
+             const isLastEmail = gameState.currentEmailIndex === gameState.emails.length - 1;
+             if (isLastEmail) {
+                document.getElementById('feedback-popup').classList.remove('active-modal');
+                document.getElementById('feedback-popup').classList.add('hidden');
+                endGame();
+             } else {
+                nextEmail(); 
+             }
+        });
+
+        document.getElementById('play-again-btn').addEventListener('click', () => {
+            document.getElementById('end-game-popup').classList.remove('active-modal');
+            document.getElementById('end-game-popup').classList.add('hidden');
+            startGame();
+        });
+        
+        document.getElementById('quit-game-btn').addEventListener('click', showThankYouScreen);
+        
+        document.getElementById('thank-you-play-again-btn').addEventListener('click', () => {
+            startGame();
+        });
+
+        // Initialize nickname input functionality
+        setupNicknameInput();
+
+    </script>
+</body>
+</html>
