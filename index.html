@@ -240,7 +240,7 @@
             }
         }
         
-        // --- MODIFIED initializeFirebaseMode ---
+        // --- initializeFirebaseMode ---
         async function initializeFirebaseMode() {
             try {
                 console.log("Loading Firebase modules...");
@@ -285,7 +285,7 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                // **CRITICAL CHANGE: Expose immediately to avoid 'System not ready' race condition**
+                // **CRITICAL: Expose immediately to avoid 'System not ready' race condition**
                 window.db = db;
                 window.auth = auth; 
                 window.loadPlayerDataByNickname = loadPlayerDataByNickname;
