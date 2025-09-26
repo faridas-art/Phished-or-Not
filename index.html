@@ -265,20 +265,38 @@
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
+                
+                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
 
                 // 1. Set up the primary auth listener and initialize app state once ready
+                // This listener will be the SOLE entry point for game initialization, preventing race conditions.
                 onAuthStateChanged(auth, async (user) => {
-                    // Step 1a: If no user is present, attempt to sign in anonymously
+                    
+                    // --- Step 1: Authentication Handler ---
                     if (!user) {
-                        console.log("No user found, signing in anonymously.");
-                        await signInAnonymously(auth);
-                        // The listener will fire again with the anonymous user after sign-in completes
-                        return;
+                        // Case A: No user yet. Try to authenticate.
+                        
+                        if (initialAuthToken) {
+                            // 1. Try custom token sign-in (if token is available)
+                            console.log("No user found. Attempting sign-in with custom token.");
+                            await signInWithCustomToken(auth, initialAuthToken).catch(e => {
+                                console.error("Custom token sign-in failed. Falling back to anonymous.", e);
+                                // If token fails, fall back to anonymous sign-in
+                                signInAnonymously(auth).catch(err => console.error("Anonymous sign-in failed:", err));
+                            });
+                        } else {
+                            // 2. Fall back to anonymous sign-in
+                            console.log("No token or user found. Signing in anonymously.");
+                            await signInAnonymously(auth).catch(e => console.error("Anonymous sign-in failed:", e));
+                        }
+                        
+                        return; // Exit until the next auth state change (when a user is created/signed in)
                     }
                     
-                    // Step 1b: If a user is present and we haven't initialized the app state yet
+                    // --- Step 2: Initialization Handler (User is now guaranteed to be authenticated) ---
                     if (user && !isAuthListenerInitialized) {
-                        console.log("User authenticated. Initializing game state.");
+                        console.log("User authenticated. Initializing game state and data listeners.");
                         isAuthListenerInitialized = true;
                         userId = user.uid;
 
@@ -286,7 +304,7 @@
                         await loadPlayerData(userId);
                         
                         isFirebaseReady = true;
-                        listenForScores(appId); // IMPORTANT: Now called *after* user is confirmed
+                        listenForScores(appId); 
                         
                         // Update UI state
                         loadingSpinner.classList.add('hidden');
@@ -296,16 +314,6 @@
                         startGameBtn.disabled = false;
                     }
                 });
-
-                // 2. Try custom token sign-in immediately if available
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                if (initialAuthToken) {
-                    console.log("Attempting sign-in with custom token.");
-                    await signInWithCustomToken(auth, initialAuthToken).catch(e => {
-                        console.error("Custom token sign-in failed, falling back to anonymous.", e);
-                        // The onAuthStateChanged listener will handle the fallback
-                    });
-                }
                 
             } catch (error) {
                 console.error("Firebase Initialization Error:", error);
