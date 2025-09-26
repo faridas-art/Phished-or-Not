@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Phishing Defense</title>
-    <!-- Tailwind CSS CDN for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
@@ -46,7 +45,6 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
-    <!-- Firebase Configuration Script - Must come BEFORE the game script -->
     <script>
         // Expose your Firebase configuration to the game script
         window.__firebase_config = JSON.stringify({
@@ -65,10 +63,8 @@
         console.log("Firebase configuration loaded:", window.__firebase_config);
     </script>
 
-    <!-- Main Game Container -->
     <div id="game-container" class="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-4xl flex flex-col items-center justify-center transition-all duration-300 min-h-[90vh] md:min-h-[80vh] relative">
         
-        <!-- Innovatech Logo -->
         <div class="absolute top-4 left-4 p-2">
             <svg class="h-8 w-8 text-indigo-600" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2L2 7V17L12 22L22 17V7L12 2ZM12 4.09L19.98 8.44V15.56L12 19.91L4.02 15.56V8.44L12 4.09ZM12 7.5L8.5 9.5V14.5L12 16.5L15.5 14.5V9.5L12 7.5Z"/>
@@ -76,7 +72,6 @@
             </svg>
         </div>
 
-        <!-- Start Screen -->
         <div id="start-screen" class="p-8 text-center">
             <h1 class="text-5xl font-bold text-gray-800 mb-4">Phishing Defense</h1>
             
@@ -93,9 +88,7 @@
             </button>
         </div>
         
-        <!-- Game View -->
         <div id="game-view" class="w-full h-full flex flex-col p-6 hidden">
-            <!-- Player Nickname Header with Pause/Quit Button -->
             <div class="flex justify-between items-center mb-4">
                 <div id="player-nickname-header" class="text-lg font-semibold text-gray-700 hidden"></div>
                 <button id="pause-quit-btn" class="px-4 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-lg hover:bg-gray-600 transition-colors duration-300 hidden">
@@ -104,10 +97,8 @@
             </div>
             
             <div id="email-content" class="bg-white rounded-lg p-6 shadow-md border border-gray-200 flex-grow overflow-y-auto min-h-[500px] flex flex-col justify-center items-center">
-                <!-- Email content will be rendered here -->
-            </div>
+                </div>
             
-            <!-- Score & Progress Display -->
             <div id="score-display" class="mt-4 hidden">
                 <div class="flex items-center justify-between text-gray-600 mb-1">
                     <span id="score-text" class="font-medium text-lg">Progress: 1/5</span>
@@ -116,7 +107,6 @@
             </div>
         </div>
 
-        <!-- Feedback Popup -->
         <div id="feedback-popup" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden transition-opacity duration-300">
             <div class="bg-white p-8 rounded-xl shadow-xl max-w-lg w-full text-center">
                 <h3 id="feedback-title" class="text-2xl font-bold mb-4 text-gray-800"></h3>
@@ -127,7 +117,6 @@
             </div>
         </div>
 
-        <!-- Pause/Quit Popup -->
         <div id="pause-quit-popup" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden transition-opacity duration-300">
             <div class="bg-white p-8 rounded-xl shadow-xl max-w-lg w-full text-center">
                 <h3 class="text-2xl font-bold mb-4 text-gray-800">Game Paused</h3>
@@ -143,15 +132,13 @@
             </div>
         </div>
 
-        <!-- End Game Scores Popup -->
         <div id="end-game-popup" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden transition-opacity duration-300">
             <div class="bg-white p-8 rounded-xl shadow-xl max-w-lg w-full text-center">
                 <h3 class="text-2xl font-bold mb-4 text-gray-800">Game Over!</h3>
                 <p id="end-game-message" class="text-gray-600 text-lg mb-6"></p>
                 <h4 class="text-xl font-semibold text-gray-800 mt-6 mb-4">Scores</h4>
                 <ul id="leaderboard" class="space-y-3">
-                    <!-- Scores items will be rendered here by JS -->
-                </ul>
+                    </ul>
                 <button id="play-again-btn" class="mt-6 w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors duration-300">
                     Play More
                 </button>
@@ -161,7 +148,6 @@
             </div>
         </div>
         
-        <!-- Thank You Page -->
         <div id="thank-you-screen" class="p-8 text-center hidden">
             <h1 id="thank-you-title" class="text-5xl font-bold text-gray-800 mb-4"></h1>
             <p id="thank-you-message" class="text-xl text-gray-500 mb-8"></p>
@@ -171,7 +157,6 @@
         </div>
     </div>
 
-    <!-- URL Tooltip to show on link hover -->
     <div id="url-tooltip" class="hidden"></div>
 
     <script type="module">
@@ -304,43 +289,22 @@
                 window.addEventListener('beforeunload', () => {
                     if (auth && auth.currentUser) {
                         console.log("Signing out user on page refresh");
+                        // Note: The anonymous user will be signed out on quit, but refreshing the page
+                        // should also clear the temporary session if it wasn't already signed out.
                         signOut(auth).catch(e => console.log("Logout error:", e));
                     }
                 });
-
-                const initialAuthToken = window.__initial_auth_token || null;
 
                 // Set up authentication listener
                 onAuthStateChanged(auth, async (user) => {
                     console.log("Auth state changed:", user ? `User signed in: ${user.uid}` : 'No user');
                     
-                    if (!user && !isAuthListenerInitialized) {
-                        console.log("Attempting authentication...");
-                        try {
-                            if (initialAuthToken) {
-                                console.log("Trying custom token auth...");
-                                await signInWithCustomToken(auth, initialAuthToken);
-                                console.log("Custom token sign-in successful");
-                            } else {
-                                console.log("Trying anonymous auth...");
-                                const userCredential = await signInAnonymously(auth);
-                                console.log("Anonymous sign-in successful:", userCredential.user.uid);
-                            }
-                        } catch (e) {
-                            console.error("Authentication failed:", e);
-                            console.log("Authentication error details:", e.code, e.message);
-                            // Fall back to offline mode on auth failure
-                            console.log("Falling back to offline mode due to auth failure");
-                            initializeOfflineMode();
-                            return;
-                        }
-                        return;
-                    }
-                    
+                    // We only want to run initialization if a user IS signed in AND it's the first time
+                    // in this session. If no user, it means the page just loaded or they signed out, so we do nothing here.
                     if (user && !isAuthListenerInitialized) {
                         console.log("Initializing game with authenticated user");
                         isAuthListenerInitialized = true;
-                        userId = user.uid;
+                        userId = user.uid; // This userId is temporary, as the nickname is the persistent ID.
 
                         // Don't auto-load player data anymore - we'll load by nickname when needed
                         isFirebaseReady = true;
@@ -348,9 +312,10 @@
                         
                         // Expose database reference and functions
                         window.db = db;
+                        window.auth = auth; // **NEW: Expose auth for explicit sign-in/out**
                         window.loadPlayerDataByNickname = loadPlayerDataByNickname;
                         
-                        updateUI('firebase', userId);
+                        // NOTE: updateUI is now called by startGame()
                     }
                 });
 
@@ -618,7 +583,7 @@
             if (mode === 'firebase') {
                 loadingMessage.textContent = "Connected! Scores will be saved to Firebase.";
                 loadingMessage.className = "text-green-600";
-                userInfoEl.textContent = `User ID: ${userId}`;
+                userInfoEl.textContent = `Session Auth ID: ${userId}`;
                 userInfoEl.classList.remove('hidden');
             } else {
                 loadingMessage.textContent = "Playing offline - scores saved locally.";
@@ -733,7 +698,14 @@
             }
             
             document.getElementById('pause-quit-popup').classList.add('hidden');
-            resetToStartScreen();
+            
+            // NEW: Sign out the temporary anonymous user (resets session for next visit)
+            if (window.logoutUser) {
+                await window.logoutUser();
+            } else {
+                // If offline mode, or logout failed, just reset UI
+                resetToStartScreen();
+            }
         }
 
         function shuffleArray(array) {
@@ -812,7 +784,7 @@
             startBtn.disabled = true;
             startBtn.textContent = "Connecting...";
 
-            // Initialize authentication now that user wants to play
+            // 1. Initialize Firebase/Offline Mode
             if (!window.authInitialized) {
                 if (window.useOfflineMode) {
                     await initializeOfflineMode();
@@ -822,24 +794,10 @@
                 window.authInitialized = true;
             }
 
-            // Load player data by nickname (new approach)
-            if (window.loadPlayerDataByNickname) {
-                const playerData = await window.loadPlayerDataByNickname(nickname, window.db || null);
-                if (playerData) {
-                    gameState.player.name = playerData.nickname;
-                    gameState.score = playerData.score;
-                    console.log(`Loaded existing player: ${playerData.nickname} with score: ${playerData.score}`);
-                } else {
-                    // New player
-                    gameState.player.name = nickname;
-                    gameState.score = 0;
-                    console.log(`New player: ${nickname}`);
-                }
-            } else {
-                // Fallback for offline mode
+            // 2. Handle Authentication and Load Data
+            if (window.useOfflineMode) {
+                // Offline mode data loading
                 gameState.player.name = nickname;
-                
-                // Load from localStorage for offline mode
                 const savedData = localStorage.getItem('phishing-defense-data');
                 if (savedData) {
                     try {
@@ -851,6 +809,44 @@
                         console.error("Error loading offline data:", e);
                     }
                 }
+                updateUI('offline'); // Update UI for offline state
+            } 
+            else if (window.db && window.auth) {
+                // Firebase mode: AUTHENTICATE FOR SESSION
+                try {
+                    // **CRUCIAL: Force anonymous sign-in for the session to gain Firestore access**
+                    const { signInAnonymously } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                    await signInAnonymously(window.auth); 
+                    
+                    // The onAuthStateChanged listener runs now, setting window.db, window.auth etc.
+                    
+                    // Load player data by nickname
+                    const playerData = await window.loadPlayerDataByNickname(nickname, window.db);
+                    if (playerData) {
+                        gameState.player.name = playerData.nickname;
+                        gameState.score = playerData.score;
+                        console.log(`Loaded existing player: ${playerData.nickname} with score: ${playerData.score}`);
+                    } else {
+                        // New player
+                        gameState.player.name = nickname;
+                        gameState.score = 0;
+                        console.log(`New player: ${nickname}`);
+                    }
+                    
+                    updateUI('firebase', window.auth.currentUser.uid); // Update UI after successful sign-in
+                } catch (e) {
+                    console.error("Firebase startup failed during startGame:", e);
+                    document.getElementById('game-status').textContent = "Error connecting to server. Try again or check console.";
+                    startBtn.disabled = false;
+                    startBtn.textContent = "Start Game";
+                    return;
+                }
+            } else {
+                console.error("System not ready or configuration error.");
+                document.getElementById('game-status').textContent = "System not ready. Try refreshing.";
+                startBtn.disabled = false;
+                startBtn.textContent = "Start Game";
+                return;
             }
             
             // Reset button state
@@ -971,156 +967,4 @@
             updateSessionScoreDisplay();
             showFeedback(isCorrect, email);
 
-            document.getElementById('safe-btn').disabled = true;
-            document.getElementById('phish-btn').disabled = true;
-        }
-
-        function showFeedback(isCorrect, email) {
-            const title = isCorrect ? "Correct!" : "Oops, Not Quite.";
-            let message = "";
-            const isLastEmail = gameState.currentEmailIndex === gameState.emails.length - 1;
-
-            if (isCorrect) {
-                message = email.isPhishing
-                    ? `<strong>Great job!</strong> You correctly spotted the scam.`
-                    : `<strong>Excellent!</strong> This was a safe and legitimate message.`;
-            } else {
-                message = email.isPhishing
-                    ? "This was a phishing email. You should have reported it."
-                    : "This was a safe email. Not every urgent email is a scam!";
-                
-                message += "<div class='text-left mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 text-gray-700'><h4 class='font-bold mb-2'>Analysis:</h4><ul class='list-disc list-inside space-y-1'>" + email.redFlags.map(flag => `<li>${flag}</li>`).join('') + "</ul></div>";
-            }
-
-            document.getElementById('next-btn').textContent = isLastEmail ? "View Final Score" : "Next Email";
-            document.getElementById('feedback-title').textContent = title;
-            document.getElementById('feedback-message').innerHTML = message;
-            document.getElementById('feedback-popup').classList.add('active-modal');
-            document.getElementById('feedback-popup').classList.remove('hidden');
-        }
-
-        function nextEmail() {
-            document.getElementById('feedback-popup').classList.remove('active-modal');
-            document.getElementById('feedback-popup').classList.add('hidden');
-            gameState.currentEmailIndex++;
-            
-            if (gameState.currentEmailIndex < gameState.emails.length) {
-                renderEmail(gameState.emails[gameState.currentEmailIndex]);
-                updateSessionScoreDisplay();
-            } else {
-                endGame();
-            }
-        }
-        
-        async function endGame() {
-            document.getElementById('game-view').classList.add('hidden');
-            document.getElementById('end-game-popup').classList.add('active-modal');
-            document.getElementById('end-game-popup').classList.remove('hidden');
-            
-            gameState.score += gameState.sessionScore;
-            
-            if (window.saveScore) {
-                await window.saveScore();
-            }
-
-            const sessionScore = gameState.sessionScore;
-            const totalEmails = gameState.emails.length;
-            
-            let finalMessage = "";
-            if (sessionScore === totalEmails) {
-                finalMessage = `Perfect defense, ${gameState.player.name}!`;
-            } else if (sessionScore >= totalEmails * 0.8) {
-                finalMessage = `Strong defense, ${gameState.player.name}!`;
-            } else {
-                finalMessage = `Good effort, ${gameState.player.name}!`;
-            }
-
-            document.getElementById('end-game-message').innerHTML = finalMessage;
-            renderLeaderboard(gameState.leaderboardScores);
-        }
-
-        function showThankYouScreen() {
-            document.getElementById('end-game-popup').classList.remove('active-modal');
-            document.getElementById('end-game-popup').classList.add('hidden');
-            document.getElementById('game-view').classList.add('hidden');
-            document.getElementById('thank-you-screen').classList.remove('hidden');
-
-            const score = gameState.score;
-            const name = gameState.player.name;
-            let title = `Thanks for Playing, ${name}!`;
-            let message = `Your total career score is <strong>${score}</strong>. Keep building that defense!`;
-
-            if (score > 15) {
-                title = `Cybersecurity Champion, ${name}!`;
-            } else if (score > 5) {
-                title = `Well Done, ${name}!`;
-            }
-
-            document.getElementById('thank-you-title').textContent = title;
-            document.getElementById('thank-you-message').innerHTML = message;
-        }
-        
-        function updateSessionScoreDisplay() {
-            const totalEmails = gameState.emails.length;
-            const currentEmailNumber = gameState.currentEmailIndex + 1;
-            
-            document.getElementById('score-text').textContent = `Email ${currentEmailNumber} of ${totalEmails}`;
-            document.getElementById('player-score').textContent = `${gameState.sessionScore} / ${totalEmails}`;
-        }
-
-        function renderLeaderboard(scores) {
-            const scoresListEl = document.getElementById('leaderboard');
-            scoresListEl.innerHTML = '';
-            
-            if (scores.length === 0) {
-                scoresListEl.innerHTML = '<li class="text-gray-500">No scores yet. Be the first!</li>';
-                return;
-            }
-
-            scores.slice(0, 10).forEach(item => {
-                const isPlayer = item.name === gameState.player.name;
-                const listItem = document.createElement('li');
-                listItem.className = `flex justify-between items-center text-gray-700 px-4 py-2 rounded-lg ${isPlayer ? 'bg-indigo-100 font-semibold border-2 border-indigo-400' : ''}`;
-                listItem.innerHTML = `
-                    <span class="truncate">${item.name} ${isPlayer ? '(You)' : ''}</span>
-                    <span class="font-bold text-lg">${item.score}</span>
-                `;
-                scoresListEl.appendChild(listItem);
-            });
-        }
-        
-        // --- Event Listeners ---
-        document.getElementById('start-game-btn').addEventListener('click', startGame);
-        document.getElementById('pause-quit-btn').addEventListener('click', pauseGame);
-        document.getElementById('resume-game-btn').addEventListener('click', resumeGame);
-        document.getElementById('save-quit-btn').addEventListener('click', saveAndQuit);
-
-        document.getElementById('next-btn').addEventListener('click', () => {
-             const isLastEmail = gameState.currentEmailIndex === gameState.emails.length - 1;
-             if (isLastEmail) {
-                document.getElementById('feedback-popup').classList.remove('active-modal');
-                document.getElementById('feedback-popup').classList.add('hidden');
-                endGame();
-             } else {
-                nextEmail(); 
-             }
-        });
-
-        document.getElementById('play-again-btn').addEventListener('click', () => {
-            document.getElementById('end-game-popup').classList.remove('active-modal');
-            document.getElementById('end-game-popup').classList.add('hidden');
-            startGame();
-        });
-        
-        document.getElementById('quit-game-btn').addEventListener('click', showThankYouScreen);
-        
-        document.getElementById('thank-you-play-again-btn').addEventListener('click', () => {
-            startGame();
-        });
-
-        // Initialize nickname input functionality
-        setupNicknameInput();
-
-    </script>
-</body>
-</html>
+            document.getElementById('safe-btn
