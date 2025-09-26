@@ -147,8 +147,7 @@
             setDoc, 
             onSnapshot, 
             collection, 
-            query, 
-            limit 
+            query
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -260,7 +259,19 @@
                 setLogLevel('Debug'); 
                 
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                const firebaseConfig = JSON.parse(__firebase_config);
+                let firebaseConfig;
+
+                // --- Robust check for config parsing error ---
+                if (typeof __firebase_config === 'string' && __firebase_config.length > 0) {
+                     try {
+                        firebaseConfig = JSON.parse(__firebase_config);
+                     } catch (e) {
+                         console.error("Failed to parse __firebase_config:", e);
+                         throw new Error("Invalid Firebase Configuration.");
+                     }
+                } else {
+                     throw new Error("Missing or empty Firebase Configuration string.");
+                }
 
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
@@ -316,7 +327,9 @@
                 });
                 
             } catch (error) {
-                console.error("Firebase Initialization Error:", error);
+                // This catch block handles errors from the explicit checks above (e.g., bad config) 
+                // and any general Firebase SDK initialization error.
+                console.error("Firebase Initialization Error:", error.message || error);
                 loadingSpinner.classList.add('hidden');
                 loadingMessage.textContent = "Error loading database. Scores will not be saved.";
                 startGameBtn.disabled = false; // Allow local play even if Firebase fails
@@ -353,10 +366,14 @@
         }
 
         function listenForScores(appId) {
+            if (!db) {
+                console.warn("Database is not initialized. Cannot listen for scores.");
+                return;
+            }
             // This still uses the public path for the global leaderboard display
             const scoresColRef = collection(db, `artifacts/${appId}/public/data/leaderboard_scores`);
             
-            // Removed limit(10) to increase robustness against potential query/indexing issues
+            // Query without limit to ensure all scores are fetched, mitigating potential query constraints
             const q = query(scoresColRef);
 
             // Setting up the real-time listener
