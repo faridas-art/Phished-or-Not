@@ -46,30 +46,24 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
-
-    <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
-
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyCQ22h4DxNd8NQm1dyJpdh-sHADu70f3YQ",
-    authDomain: "phish-or-not-project.firebaseapp.com",
-    projectId: "phish-or-not-project",
-    storageBucket: "phish-or-not-project.firebasestorage.app",
-    messagingSenderId: "455143280251",
-    appId: "1:455143280251:web:3d7dd344688b1c1c2edcde",
-    measurementId: "G-CF68SPNSJM"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-</script>
+    <!-- Firebase Configuration Script - Must come BEFORE the game script -->
+    <script>
+        // Expose your Firebase configuration to the game script
+        window.__firebase_config = JSON.stringify({
+            apiKey: "AIzaSyCQ22h4DxNd8NQm1dyJpdh-sHADu70f3YQ",
+            authDomain: "phish-or-not-project.firebaseapp.com",
+            projectId: "phish-or-not-project",
+            storageBucket: "phish-or-not-project.firebasestorage.app",
+            messagingSenderId: "455143280251",
+            appId: "1:455143280251:web:3d7dd344688b1c1c2edcde",
+            measurementId: "G-CF68SPNSJM"
+        });
+        
+        // Set your app identifier
+        window.__app_id = "phishing-defense-game";
+        
+        console.log("Firebase configuration loaded:", window.__firebase_config);
+    </script>
 
     <!-- Main Game Container -->
     <div id="game-container" class="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-4xl flex flex-col items-center justify-center transition-all duration-300 min-h-[90vh] md:min-h-[80vh] relative">
@@ -162,6 +156,8 @@
     <script type="module">
         // --- Configuration Check ---
         console.log("Starting Firebase initialization...");
+        console.log("Available config:", !!window.__firebase_config);
+        console.log("Available app_id:", !!window.__app_id);
         
         // Check for required configuration variables
         const requiredVars = ['__firebase_config', '__app_id'];
@@ -179,6 +175,7 @@
         // --- Firebase Mode ---
         async function initializeFirebaseMode() {
             try {
+                console.log("Loading Firebase modules...");
                 const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
                 const { 
                     getAuth, 
@@ -207,39 +204,40 @@
                 try {
                     firebaseConfig = typeof window.__firebase_config === 'string' ? 
                         JSON.parse(window.__firebase_config) : window.__firebase_config;
+                    console.log("Firebase config parsed successfully");
                 } catch (e) {
                     console.error("Failed to parse Firebase config:", e);
                     throw new Error("Invalid Firebase Configuration");
                 }
 
-                console.log("Firebase config parsed:", Object.keys(firebaseConfig));
-
+                console.log("Initializing Firebase app...");
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                console.log("Firebase app initialized");
+                console.log("Firebase app initialized successfully");
 
                 const initialAuthToken = window.__initial_auth_token || null;
 
                 // Set up authentication listener
                 onAuthStateChanged(auth, async (user) => {
-                    console.log("Auth state changed:", user ? 'User signed in' : 'No user');
+                    console.log("Auth state changed:", user ? `User signed in: ${user.uid}` : 'No user');
                     
                     if (!user) {
                         console.log("Attempting authentication...");
-                        if (initialAuthToken) {
-                            try {
+                        try {
+                            if (initialAuthToken) {
+                                console.log("Trying custom token auth...");
                                 await signInWithCustomToken(auth, initialAuthToken);
                                 console.log("Custom token sign-in successful");
-                            } catch (e) {
-                                console.error("Custom token sign-in failed:", e);
+                            } else {
+                                console.log("Trying anonymous auth...");
                                 await signInAnonymously(auth);
                                 console.log("Anonymous sign-in successful");
                             }
-                        } else {
-                            await signInAnonymously(auth);
-                            console.log("Anonymous sign-in successful");
+                        } catch (e) {
+                            console.error("Authentication failed:", e);
+                            throw e;
                         }
                         return;
                     }
@@ -259,6 +257,7 @@
 
                 // Firebase-specific functions
                 async function loadPlayerData(uid, database) {
+                    console.log("Loading player data for:", uid);
                     if (!database || !uid) return;
                     const appId = window.__app_id || 'default-app-id';
                     
@@ -273,18 +272,20 @@
                             
                             document.getElementById('nickname-input').value = gameState.player.name;
                             document.getElementById('game-status').innerHTML = `Welcome back, <strong>${gameState.player.name}</strong>! Your total score is ${gameState.score}.`;
+                            console.log("Player data loaded from Firestore:", gameState.player.name, gameState.score);
                         } else {
                             gameState.score = 0;
                             gameState.player.name = "";
                             document.getElementById('game-status').textContent = "Enter your nickname to start.";
+                            console.log("No existing player data found");
                         }
-                        console.log("Player data loaded:", gameState.player.name, gameState.score);
                     } catch (e) {
                         console.error("Error loading player data:", e);
                     }
                 }
 
                 function listenForScores(database) {
+                    console.log("Setting up leaderboard listener...");
                     if (!database) return;
                     
                     const appId = window.__app_id || 'default-app-id';
@@ -316,6 +317,7 @@
 
                 // Expose Firebase functions to global scope
                 window.saveScore = async function() {
+                    console.log("Saving score to Firebase...");
                     if (!isFirebaseReady || !userId) {
                         console.warn("Firebase not ready. Score not saved.");
                         return;
@@ -368,6 +370,7 @@
                     gameState.score = parsed.score || 0;
                     gameState.player.name = parsed.name || "";
                     gameState.leaderboardScores = parsed.leaderboard || [];
+                    console.log("Loaded offline data:", parsed);
                 } catch (e) {
                     console.error("Error parsing saved data:", e);
                 }
@@ -399,6 +402,7 @@
                     }
                     
                     gameState.leaderboardScores.sort((a, b) => b.score - a.score);
+                    console.log("Score saved locally");
                 } catch (e) {
                     console.error("Error saving to localStorage:", e);
                 }
@@ -417,11 +421,13 @@
             loadingSpinner.classList.add('hidden');
             
             if (mode === 'firebase') {
-                loadingMessage.textContent = "Connected! Scores will be saved.";
+                loadingMessage.textContent = "Connected! Scores will be saved to Firebase.";
+                loadingMessage.className = "text-green-600";
                 userInfoEl.textContent = `User ID: ${userId}`;
                 userInfoEl.classList.remove('hidden');
             } else {
                 loadingMessage.textContent = "Playing offline - scores saved locally.";
+                loadingMessage.className = "text-yellow-600";
                 userInfoEl.textContent = "Offline Mode";
                 userInfoEl.classList.remove('hidden');
             }
