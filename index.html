@@ -421,14 +421,14 @@
             loadingSpinner.classList.add('hidden');
             
             if (mode === 'firebase') {
-                loadingMessage.textContent = "Connected! Scores will be saved to Firebase.";
+                loadingMessage.textContent = "Connected!";
                 loadingMessage.className = "text-green-600";
-                userInfoEl.textContent = `User ID: ${userId}`;
+               // userInfoEl.textContent = `User ID: ${userId}`;
                 userInfoEl.classList.remove('hidden');
             } else {
-                loadingMessage.textContent = "Playing offline - scores saved locally.";
+                loadingMessage.textContent = "Playing offline!";
                 loadingMessage.className = "text-yellow-600";
-                userInfoEl.textContent = "Offline Mode";
+               // userInfoEl.textContent = "Offline Mode";
                 userInfoEl.classList.remove('hidden');
             }
             
