@@ -239,6 +239,8 @@
                 return [];
             }
         }
+        
+        // --- MODIFIED initializeFirebaseMode ---
         async function initializeFirebaseMode() {
             try {
                 console.log("Loading Firebase modules...");
@@ -261,7 +263,7 @@
                     getDocs
                 } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
 
-                let db, auth, userId = null;
+                let db, auth;
                 let isFirebaseReady = false;
                 let isAuthListenerInitialized = false;
 
@@ -283,51 +285,37 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                console.log("Firebase app initialized successfully");
+                // **CRITICAL CHANGE: Expose immediately to avoid 'System not ready' race condition**
+                window.db = db;
+                window.auth = auth; 
+                window.loadPlayerDataByNickname = loadPlayerDataByNickname;
+                window.searchNicknames = searchExistingNicknames;
+                
+                // Initialize Firebase Ready flag and start listening for scores
+                isFirebaseReady = true;
+                listenForScores(db);
+                
+                console.log("Firebase app initialized and core services exposed.");
 
                 // Add logout functionality for page refresh
                 window.addEventListener('beforeunload', () => {
                     if (auth && auth.currentUser) {
                         console.log("Signing out user on page refresh");
-                        // Note: The anonymous user will be signed out on quit, but refreshing the page
-                        // should also clear the temporary session if it wasn't already signed out.
                         signOut(auth).catch(e => console.log("Logout error:", e));
                     }
                 });
 
-                // Set up authentication listener
+                // Set up authentication listener (Only runs when sign-in is forced in startGame)
                 onAuthStateChanged(auth, async (user) => {
                     console.log("Auth state changed:", user ? `User signed in: ${user.uid}` : 'No user');
                     
-                    // We only want to run initialization if a user IS signed in AND it's the first time
-                    // in this session. If no user, it means the page just loaded or they signed out, so we do nothing here.
                     if (user && !isAuthListenerInitialized) {
-                        console.log("Initializing game with authenticated user");
+                        console.log("Auth event received for session initialization.");
                         isAuthListenerInitialized = true;
-                        userId = user.uid; // This userId is temporary, as the nickname is the persistent ID.
-
-                        // Don't auto-load player data anymore - we'll load by nickname when needed
-                        isFirebaseReady = true;
-                        listenForScores(db);
-                        
-                        // Expose database reference and functions
-                        window.db = db;
-                        window.auth = auth; // **NEW: Expose auth for explicit sign-in/out**
-                        window.loadPlayerDataByNickname = loadPlayerDataByNickname;
-                        
-                        // NOTE: updateUI is now called by startGame()
                     }
                 });
 
                 // Firebase-specific functions
-                async function loadPlayerData(uid, database) {
-                    console.log("Loading player data for:", uid);
-                    if (!database || !uid) return;
-                    
-                    // Player data is now stored by nickname, not by Firebase UID
-                    // We'll load this data when the user enters their nickname
-                }
-
                 // Load player data by nickname (new approach)
                 async function loadPlayerDataByNickname(nickname, database) {
                     console.log("Loading player data for nickname:", nickname);
@@ -409,9 +397,6 @@
                         return [];
                     }
                 }
-
-                // Expose search function globally (replaces offline version)
-                window.searchNicknames = searchExistingNicknames;
 
                 function listenForScores(database) {
                     console.log("Setting up leaderboard listener...");
@@ -583,7 +568,7 @@
             if (mode === 'firebase') {
                 loadingMessage.textContent = "Connected! Scores will be saved to Firebase.";
                 loadingMessage.className = "text-green-600";
-                userInfoEl.textContent = `Session Auth ID: ${userId}`;
+                userInfoEl.textContent = userId ? `Session Auth ID: ${userId}` : 'Authenticated for session.';
                 userInfoEl.classList.remove('hidden');
             } else {
                 loadingMessage.textContent = "Playing offline - scores saved locally.";
