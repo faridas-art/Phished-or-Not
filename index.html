@@ -210,18 +210,48 @@
             userInfoEl.classList.remove('hidden');
             startGameBtn.disabled = false;
             
-            // Load any locally saved data for display
+            // Don't load or display any saved data on page load for privacy
+            document.getElementById('game-status').textContent = "Enter your nickname to start.";
+            
+            // Set up basic offline nickname search
+            window.searchNicknames = searchOfflineNicknames;
+        }
+
+        // Simple offline nickname search using localStorage
+        async function searchOfflineNicknames(searchTerm) {
+            if (!searchTerm.trim()) return [];
+            
             const savedData = localStorage.getItem('phishing-defense-data');
-            if (savedData) {
-                try {
-                    const parsed = JSON.parse(savedData);
-                    if (parsed.name) {
-                        document.getElementById('nickname-input').value = parsed.name;
-                        document.getElementById('game-status').innerHTML = `Welcome back, <strong>${parsed.name}</strong>! Your last score was ${parsed.score || 0}.`;
+            if (!savedData) return [];
+            
+            try {
+                const parsed = JSON.parse(savedData);
+                const matches = [];
+                const searchLower = searchTerm.toLowerCase().trim();
+                
+                if (parsed.name) {
+                    const nameLower = parsed.name.toLowerCase();
+                    if (nameLower === searchLower) {
+                        matches.push({
+                            nickname: parsed.name,
+                            score: parsed.score || 0,
+                            exact: true,
+                            userId: 'local'
+                        });
+                    } else if (nameLower.includes(searchLower)) {
+                        matches.push({
+                            nickname: parsed.name,
+                            score: parsed.score || 0,
+                            exact: false,
+                            userId: 'local'
+                        });
                     }
-                } catch (e) {
-                    console.error("Error parsing saved data:", e);
                 }
+                
+                return matches;
+            } catch (e) {
+                console.error("Error searching offline nicknames:", e);
+                return [];
             }
         }
         async function initializeFirebaseMode() {
@@ -403,7 +433,7 @@
                     }
                 }
 
-                // Expose search function globally
+                // Expose search function globally (replaces offline version)
                 window.searchNicknames = searchExistingNicknames;
 
                 function listenForScores(database) {
@@ -706,19 +736,17 @@
                 
                 if (value.length < 2) return;
                 
-                // Only search if Firebase is already initialized
-                if (!window.searchNicknames || !window.authInitialized) return;
-                
-                // Debounce search
-                clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(async () => {
-                    if (window.searchNicknames) {
+                // Use available search function (offline initially, then Firebase after auth)
+                if (window.searchNicknames) {
+                    // Debounce search
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(async () => {
                         const suggestions = await window.searchNicknames(value, window.db || null);
                         if (suggestions.length > 0) {
                             showNicknameSuggestions(suggestions, value);
                         }
-                    }
-                }, 300);
+                    }, 300);
+                }
             });
             
             // Hide suggestions when clicking outside
