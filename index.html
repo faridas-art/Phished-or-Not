@@ -108,7 +108,7 @@
             <div class="bg-white p-8 rounded-xl shadow-xl max-w-lg w-full text-center">
                 <h3 class="text-2xl font-bold mb-4 text-gray-800">Game Over!</h3>
                 <p id="end-game-message" class="text-gray-600 text-lg mb-6"></p>
-                <h4 class="text-xl font-semibold text-gray-800 mt-6 mb-4">Top Scores (Total Career Score)</h4>
+                <h4 class="text-xl font-semibold text-gray-800 mt-6 mb-4">Scores</h4>
                 <ul id="leaderboard" class="space-y-3">
                     <!-- Scores items will be rendered here by JS -->
                 </ul>
@@ -335,7 +335,7 @@
                 // and any general Firebase SDK initialization error.
                 console.error("Firebase Initialization Error:", error.message || error);
                 loadingSpinner.classList.add('hidden');
-                loadingMessage.textContent = "Error loading database. Scores will not be saved.";
+                loadingMessage.textContent = "Scores will not be saved.";
                 startGameBtn.disabled = false; // Allow local play even if Firebase fails
             }
         }
@@ -626,11 +626,11 @@
             let finalMessage = "";
 
             if (sessionScore === totalEmails) {
-                finalMessage = `Perfect defense, ${gameState.player.name}! You mastered this round.`;
+                finalMessage = `Perfect defense, ${gameState.player.name}!`;
             } else if (sessionScore >= totalEmails * 0.8) {
-                finalMessage = `Strong defense, ${gameState.player.name}! Keep up the vigilance.`;
+                finalMessage = `Strong defense, ${gameState.player.name}!`;
             } else {
-                finalMessage = `Good effort, ${gameState.player.name}! Let's review the leaderboard.`;
+                finalMessage = `Good effort, ${gameState.player.name}!`;
             }
 
             endGameMessageEl.innerHTML = finalMessage;
@@ -648,7 +648,7 @@
             const score = gameState.score;
             const name = gameState.player.name;
             let title = `Thanks for Playing, ${name}!`;
-            let message = `Your total career score is **${score}**. Keep building that defense!`;
+           // let message = `Your total career score is **${score}**. Keep building that defense!`;
 
             if (score > 15) {
                 title = `Cybersecurity Champion, ${name}!`;
