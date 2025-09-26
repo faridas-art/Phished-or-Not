@@ -32,7 +32,7 @@
         /* Loading spinner CSS */
         .loader {
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #3b82f6;
+            border-top: 4px solid #4f46e5; /* Indigo color for spinner */
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -51,7 +51,7 @@
         
         <!-- Innovatech Logo -->
         <div class="absolute top-4 left-4 p-2">
-            <svg class="h-8 w-8 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+            <svg class="h-8 w-8 text-indigo-600" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2L2 7V17L12 22L22 17V7L12 2ZM12 4.09L19.98 8.44V15.56L12 19.91L4.02 15.56V8.44L12 4.09ZM12 7.5L8.5 9.5V14.5L12 16.5L15.5 14.5V9.5L12 7.5Z"/>
                 <text x="12" y="15" font-family="Arial" font-size="8" font-weight="bold" text-anchor="middle" fill="#ffffff">I</text>
             </svg>
@@ -68,15 +68,15 @@
             </div>
 
             <p id="game-status" class="text-center text-gray-600 mb-4">Enter your nickname to start.</p>
-            <input type="text" id="nickname-input" placeholder="Your Nickname" class="w-full max-w-xs px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 text-center">
-            <button id="start-game-btn" class="w-full max-w-xs px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-700 transition-colors duration-300 disabled:opacity-50" disabled>
+            <input type="text" id="nickname-input" placeholder="Your Nickname" class="w-full max-w-xs px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 text-center">
+            <button id="start-game-btn" class="w-full max-w-xs px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors duration-300 disabled:opacity-50" disabled>
                 Start Game
             </button>
         </div>
         
         <!-- Game View -->
         <div id="game-view" class="w-full h-full flex flex-col p-6 hidden">
-            <!-- Player Nickname Header (NEW ELEMENT) -->
+            <!-- Player Nickname Header -->
             <div id="player-nickname-header" class="text-lg font-semibold text-gray-700 mb-4 hidden"></div>
             
             <div id="email-content" class="bg-white rounded-lg p-6 shadow-md border border-gray-200 flex-grow overflow-y-auto min-h-[500px] flex flex-col justify-center items-center">
@@ -97,7 +97,7 @@
             <div class="bg-white p-8 rounded-xl shadow-xl max-w-lg w-full text-center">
                 <h3 id="feedback-title" class="text-2xl font-bold mb-4 text-gray-800"></h3>
                 <p id="feedback-message" class="text-gray-600 mb-6"></p>
-                <button id="next-btn" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-700 transition-colors duration-300">
+                <button id="next-btn" class="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors duration-300">
                     Next Email
                 </button>
             </div>
@@ -112,11 +112,11 @@
                 <ul id="leaderboard" class="space-y-3">
                     <!-- Scores items will be rendered here by JS -->
                 </ul>
-                <button id="play-again-btn" class="mt-6 w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-700 transition-colors duration-300">
-                    Start New Game
+                <button id="play-again-btn" class="mt-6 w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors duration-300">
+                    Play More
                 </button>
                 <button id="quit-game-btn" class="mt-4 w-full px-6 py-3 bg-gray-300 text-gray-800 font-semibold rounded-lg shadow-lg hover:bg-gray-400 transition-colors duration-300">
-                    Quit
+                    That's it for now
                 </button>
             </div>
         </div>
@@ -125,7 +125,7 @@
         <div id="thank-you-screen" class="p-8 text-center hidden">
             <h1 id="thank-you-title" class="text-5xl font-bold text-gray-800 mb-4"></h1>
             <p id="thank-you-message" class="text-xl text-gray-500 mb-8"></p>
-            <button id="thank-you-play-again-btn" class="w-full max-w-xs px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-700 transition-colors duration-300">
+            <button id="thank-you-play-again-btn" class="w-full max-w-xs px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors duration-300">
                 Play More
             </button>
         </div>
@@ -178,7 +178,7 @@
                     id: 1,
                     sender: "Netflix Support <noreply@netflix-update.co>",
                     subject: "Your Netflix account has been suspended",
-                    body: "We have temporarily suspended your account due to an issue with your billing information. Please click the link below to verify your details and reactivate your account. <br><br> <a href='http://netflix-login.info/update' class='text-blue-600 hover:underline'>Click here to update your account</a>",
+                    body: "We have temporarily suspended your account due to an issue with your billing information. Please click the link below to verify your details and reactivate your account. <br><br> <a href='http://netflix-login.info/update' class='text-indigo-600 hover:underline'>Click here to update your account</a>",
                     isPhishing: true,
                     redFlags: ["Sender's email domain (@netflix-update.co) is incorrect.","Urgent and threatening language is a common tactic.","The link points to a non-Netflix URL."]
                 },
@@ -186,7 +186,7 @@
                     id: 2,
                     sender: "Amazon <security@amazon.com>",
                     subject: "Order Confirmation: Your recent purchase",
-                    body: "Dear [User Name], <br><br> Thank you for your recent purchase. Your order #113-456789-012345 has been confirmed and will be shipped shortly. You can track your order here: <a href='https://amazon.com/tracking' class='text-blue-600 hover:underline'>Track Package</a>. <br><br> Sincerely, <br>The Amazon Team",
+                    body: "Dear [User Name], <br><br> Thank you for your recent purchase. Your order #113-456789-012345 has been confirmed and will be shipped shortly. You can track your order here: <a href='https://amazon.com/tracking' class='text-indigo-600 hover:underline'>Track Package</a>. <br><br> Sincerely, <br>The Amazon Team",
                     isPhishing: false,
                     redFlags: ["Sender's domain is correct.","No sense of urgency or threat.","Link points to the correct domain."]
                 },
@@ -194,7 +194,7 @@
                     id: 3,
                     sender: "HR Department <HR-announcements@innovatech-internal.com>",
                     subject: "Mandatory System Update",
-                    body: "All employees must update their system credentials via the link below to comply with new security protocols. Failure to do so will result in a temporary suspension of access. <br><br> <a href='http://credentials-update.co/login' class='text-blue-600 hover:underline'>Update Credentials Now</a>",
+                    body: "All employees must update their system credentials via the link below to comply with new security protocols. Failure to do so will result in a temporary suspension of access. <br><br> <a href='http://credentials-update.co/login' class='text-indigo-600 hover:underline'>Update Credentials Now</a>",
                     isPhishing: true,
                     redFlags: ["Urgent, high-pressure language to create panic.","The email asks for credentials, which a legitimate IT department would not do.","The email domain is incorrect (it should be @innovatech.com)."]
                 },
@@ -202,7 +202,7 @@
                     id: 4,
                     sender: "IT Support <support@innovatech.com>",
                     subject: "New IT Portal for Support Requests",
-                    body: "Hi team, <br><br> We are rolling out a new IT support portal to streamline requests. You can now submit tickets directly at our new portal. Please bookmark the link for future use: <br><br> <a href='https://portal.innovatech.com' class='text-blue-600 hover:underline'>https://portal.innovatech.com</a>",
+                    body: "Hi team, <br><br> We are rolling out a new IT support portal to streamline requests. You can now submit tickets directly at our new portal. Please bookmark the link for future use: <br><br> <a href='https://portal.innovatech.com' class='text-indigo-600 hover:underline'>https://portal.innovatech.com</a>",
                     isPhishing: false,
                     redFlags: ["Sender's email and tone are appropriate for an internal notice.","The link points to a plausible internal sub-domain.","No sudden urgent requests for sensitive data."]
                 },
@@ -210,7 +210,7 @@
                     id: 5,
                     sender: "Accounts Payable <payments@invoicesystem.co>",
                     subject: "URGENT Invoice from Supplier",
-                    body: "Attached is an invoice for a recent order. Please transfer payment within 24 hours to the new bank account number listed in the attached document to avoid late fees. <br><br> Attachment: <a href='http://invoicesystem.com/payment' class='text-blue-600 hover:underline'>Invoice_#3459.pdf</a>",
+                    body: "Attached is an invoice for a recent order. Please transfer payment within 24 hours to the new bank account number listed in the attached document to avoid late fees. <br><br> Attachment: <a href='http://invoicesystem.com/payment' class='text-indigo-600 hover:underline'>Invoice_#3459.pdf</a>",
                     isPhishing: true,
                     redFlags: ["Extreme urgency and pressure for financial action.","Request to change payment details unexpectedly.","Sender's email address is from a generic, suspicious domain."]
                 }
@@ -242,7 +242,7 @@
         const loadingSpinner = document.getElementById('loading-spinner');
         const loadingMessage = document.getElementById('loading-message');
         const userInfoEl = document.getElementById('user-info');
-        const playerNicknameHeaderEl = document.getElementById('player-nickname-header'); // NEW
+        const playerNicknameHeaderEl = document.getElementById('player-nickname-header'); 
         
         // --- Utility Functions ---
         
@@ -471,7 +471,8 @@
             scores.slice(0, 10).forEach(item => { // Show top 10
                 const isPlayer = item.id === userId;
                 const listItem = document.createElement('li');
-                listItem.className = `flex justify-between items-center text-gray-700 px-4 py-2 rounded-lg ${isPlayer ? 'bg-blue-100 font-semibold border-2 border-blue-400' : ''}`;
+                // Use indigo for the current player highlight
+                listItem.className = `flex justify-between items-center text-gray-700 px-4 py-2 rounded-lg ${isPlayer ? 'bg-indigo-100 font-semibold border-2 border-indigo-400' : ''}`;
                 listItem.innerHTML = `
                     <span class="truncate">${item.name} ${isPlayer ? '(You)' : ''}</span>
                     <span class="font-bold text-lg">${item.score}</span>
@@ -490,8 +491,8 @@
             }
             gameState.player.name = nickname;
             
-            // Set nickname header in game view
-            playerNicknameHeaderEl.textContent = `Logged in as: ${gameState.player.name}`;
+            // Set friendly nickname header in game view
+            playerNicknameHeaderEl.textContent = `Hello, ${gameState.player.name}! Defend the inbox.`;
             playerNicknameHeaderEl.classList.remove('hidden');
 
             // Reset session-specific game state
@@ -510,7 +511,6 @@
         }
 
         function renderEmail(email) {
-            // ... (rest of renderEmail function remains mostly the same)
             emailContent.classList.remove('justify-center', 'items-center');
 
             const escapedSender = email.sender
@@ -530,7 +530,7 @@
                         <i class="fas fa-check-circle mr-2"></i> Safe
                     </button>
                     <button id="phish-btn" class="w-full px-6 py-3 bg-red-500 text-white font-semibold rounded-lg shadow-lg hover:bg-red-600 transition-colors duration-300">
-                        <i class="fas fa-exclamation-triangle mr-2"></i> Spam/Phishing
+                        <i class="fas fa-exclamation-triangle mr-2"></i> Spam
                     </button>
                 </div>
             `;
@@ -579,12 +579,14 @@
                     ? `**Great job!** You correctly spotted the scam.`
                     : `**Excellent!** This was a safe and legitimate message.`;
             } else {
+                // If incorrect, provide the reason (the red flags)
                 message = email.isPhishing
                     ? "This was a phishing email. You should have reported it."
                     : "This was a safe email. Not every urgent email is a scam!";
+                
+                // Add the analysis block ONLY when the user is incorrect
+                message += "<div class='text-left mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 text-gray-700'><h4 class='font-bold mb-2'>Analysis:</h4><ul class='list-disc list-inside space-y-1'>" + email.redFlags.map(flag => `<li>${flag}</li>`).join('') + "</ul></div>";
             }
-
-            message += "<div class='text-left mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 text-gray-700'><h4 class='font-bold mb-2'>Analysis:</h4><ul class='list-disc list-inside space-y-1'>" + email.redFlags.map(flag => `<li>${flag}</li>`).join('') + "</ul></div>";
 
             nextBtn.textContent = isLastEmail ? "View Final Score" : "Next Email";
 
@@ -620,17 +622,16 @@
             const sessionScore = gameState.sessionScore;
             const totalEmails = gameState.emails.length;
             
-            // Simplified message for end-game popup
+            // Simplified, score-less message for end-game popup
             let finalMessage = "";
 
             if (sessionScore === totalEmails) {
-                finalMessage = `Perfect defense, ${gameState.player.name}! You correctly identified all ${totalEmails} messages in this round.`;
+                finalMessage = `Perfect defense, ${gameState.player.name}! You mastered this round.`;
             } else if (sessionScore >= totalEmails * 0.8) {
-                finalMessage = `Strong defense, ${gameState.player.name}! You correctly identified ${sessionScore}/${totalEmails} messages this round.`;
+                finalMessage = `Strong defense, ${gameState.player.name}! Keep up the vigilance.`;
             } else {
-                finalMessage = `Well played, ${gameState.player.name}! You scored ${sessionScore}/${totalEmails} this round.`;
+                finalMessage = `Good effort, ${gameState.player.name}! Let's review the leaderboard.`;
             }
-            // Removed: finalMessage += `<br>Your new **TOTAL Career Score** is **${gameState.score}**.`;
 
             endGameMessageEl.innerHTML = finalMessage;
             
