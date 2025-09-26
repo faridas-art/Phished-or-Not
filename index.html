@@ -1,0 +1,432 @@
+<!DOCTYPE ahtml>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phishing Defense</title>
+    <!-- Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        /* Styling for the URL tooltip */
+        #url-tooltip {
+            position: fixed;
+            background-color: #1f2937;
+            color: #ffffff;
+            font-size: 0.75rem;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            z-index: 50;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main Game Container -->
+    <div id="game-container" class="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-4xl flex flex-col items-center justify-center transition-all duration-300 min-h-[90vh] md:min-h-[80vh] relative">
+        
+        <!-- Innovatech Logo -->
+        <div class="absolute top-4 left-4 p-2">
+            <svg class="h-8 w-8 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L2 7V17L12 22L22 17V7L12 2ZM12 4.09L19.98 8.44V15.56L12 19.91L4.02 15.56V8.44L12 4.09ZM12 7.5L8.5 9.5V14.5L12 16.5L15.5 14.5V9.5L12 7.5Z"/>
+                <text x="12" y="15" font-family="Arial" font-size="8" font-weight="bold" text-anchor="middle" fill="#ffffff">I</text>
+            </svg>
+        </div>
+
+        <!-- Start Screen -->
+        <div id="start-screen" class="p-8 text-center">
+            <h1 class="text-5xl font-bold text-gray-800 mb-4">Phishing Defense</h1>
+            
+            <p id="game-status" class="text-center text-gray-600 mb-4">Enter your nickname to start.</p>
+            <input type="text" id="nickname-input" placeholder="Your Nickname" class="w-full max-w-xs px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 text-center">
+            <button id="start-game-btn" class="w-full max-w-xs px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-700 transition-colors duration-300">
+                Start Game
+            </button>
+        </div>
+        
+        <!-- Game View -->
+        <div id="game-view" class="w-full h-full flex flex-col p-6 hidden">
+            <div id="email-content" class="bg-white rounded-lg p-6 shadow-md border border-gray-200 flex-grow overflow-y-auto">
+                <!-- Email content will be rendered here -->
+            </div>
+            
+            <!-- Score & Progress Bar -->
+            <div id="score-display" class="mt-4 hidden">
+                <div class="flex items-center justify-between text-gray-600 mb-1">
+                    <span id="score-text" class="font-medium text-lg">Your Score: 0/0</span>
+                    <span id="player-score" class="font-bold text-gray-800 text-xl">0</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="score-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feedback Popup -->
+        <div id="feedback-popup" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden transition-opacity duration-300">
+            <div class="bg-white p-8 rounded-xl shadow-xl max-w-lg w-full text-center">
+                <h3 id="feedback-title" class="text-2xl font-bold mb-4 text-gray-800"></h3>
+                <p id="feedback-message" class="text-gray-600 mb-6"></p>
+                <button id="next-btn" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-700 transition-colors duration-300">
+                    Continue
+                </button>
+            </div>
+        </div>
+
+        <!-- End Game Scores Popup -->
+        <div id="end-game-popup" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden transition-opacity duration-300">
+            <div class="bg-white p-8 rounded-xl shadow-xl max-w-lg w-full text-center">
+                <h3 class="text-2xl font-bold mb-4 text-gray-800">Game Over!</h3>
+                <p id="end-game-message" class="text-gray-600 text-lg mb-6"></p>
+                <h4 class="text-xl font-semibold text-gray-800 mt-6 mb-4">Scores</h4>
+                <ul id="leaderboard" class="space-y-3">
+                    <!-- Scores items will be rendered here by JS -->
+                </ul>
+                <button id="play-again-btn" class="mt-6 w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-700 transition-colors duration-300">
+                    Play More
+                </button>
+                <button id="quit-game-btn" class="mt-4 w-full px-6 py-3 bg-gray-300 text-gray-800 font-semibold rounded-lg shadow-lg hover:bg-gray-400 transition-colors duration-300">
+                    That's it for now
+                </button>
+            </div>
+        </div>
+        
+        <!-- Thank You Page -->
+        <div id="thank-you-screen" class="p-8 text-center hidden">
+            <h1 id="thank-you-title" class="text-5xl font-bold text-gray-800 mb-4"></h1>
+            <p id="thank-you-message" class="text-xl text-gray-500 mb-8"></p>
+            <button id="thank-you-play-again-btn" class="w-full max-w-xs px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-700 transition-colors duration-300">
+                Play More
+            </button>
+        </div>
+    </div>
+
+    <!-- URL Tooltip to show on link hover -->
+    <div id="url-tooltip" class="hidden"></div>
+
+    <script>
+        // Game state and data
+        const gameState = {
+            emails: [],
+            currentEmailIndex: 0,
+            score: 0, // This is the total, cumulative score
+            sessionScore: 0, // This is the score for the current game
+            isGameOver: false,
+            player: { name: "" },
+            scores: [
+                { name: "Player1", score: 7 },
+                { name: "User_xyz", score: 6 },
+                { name: "Alex", score: 5 },
+                { name: "Pat", score: 4 }
+            ],
+            // Pre-defined set of phishing scenarios and safe emails
+            scenarios: [
+                {
+                    id: 1,
+                    sender: "Netflix Support <noreply@netflix-update.co>",
+                    subject: "Your Netflix account has been suspended",
+                    body: "We have temporarily suspended your account due to an issue with your billing information. Please click the link below to verify your details and reactivate your account. <br><br> <a href='http://netflix-login.info/update' class='text-blue-600 hover:underline'>Click here to update your account</a>",
+                    isPhishing: true,
+                    redFlags: ["Sender's email domain (@netflix-update.co) is incorrect.","Urgent and threatening language is a common tactic.","The link points to a non-Netflix URL."]
+                },
+                {
+                    id: 2,
+                    sender: "Amazon <security@amazon.com>",
+                    subject: "Order Confirmation: Your recent purchase",
+                    body: "Dear [User Name], <br><br> Thank you for your recent purchase. Your order #113-456789-012345 has been confirmed and will be shipped shortly. You can track your order here: <a href='https://amazon.com/tracking' class='text-blue-600 hover:underline'>Track Package</a>. <br><br> Sincerely, <br>The Amazon Team",
+                    isPhishing: false,
+                    redFlags: []
+                },
+                {
+                    id: 3,
+                    sender: "HR Department <HR-announcements@innovatech-internal.com>",
+                    subject: "Mandatory System Update",
+                    body: "All employees must update their system credentials via the link below to comply with new security protocols. Failure to do so will result in a temporary suspension of access. <br><br> <a href='http://credentials-update.co/login' class='text-blue-600 hover:underline'>Update Credentials Now</a>",
+                    isPhishing: true,
+                    redFlags: ["Urgent, high-pressure language to create panic.","The email asks for credentials, which a legitimate IT department would not do.","The email domain is incorrect (it should be @innovatech.com)."]
+                },
+                {
+                    id: 4,
+                    sender: "IT Support <support@innovatech.com>",
+                    subject: "New IT Portal for Support Requests",
+                    body: "Hi team, <br><br> We are rolling out a new IT support portal to streamline requests. You can now submit tickets directly at our new portal. Please bookmark the link for future use: <br><br> <a href='https://portal.innovatech.com' class='text-blue-600 hover:underline'>https://portal.innovatech.com</a>",
+                    isPhishing: false,
+                    redFlags: []
+                },
+                {
+                    id: 5,
+                    sender: "Accounts Payable <payments@invoicesystem.co>",
+                    subject: "URGENT Invoice from Supplier",
+                    body: "Attached is an invoice for a recent order. Please transfer payment within 24 hours to the new bank account number listed in the attached document to avoid late fees. <br><br> Attachment: <a href='http://invoicesystem.com/payment' class='text-blue-600 hover:underline'>Invoice_#3459.pdf</a>",
+                    isPhishing: true,
+                    redFlags: ["Extreme urgency and pressure.","Request to change payment details unexpectedly.","Sender's email address is from a generic domain."]
+                }
+            ],
+            userAnswers: {} // Stores user's answers to track progress
+        };
+
+        // DOM elements
+        const gameContainer = document.getElementById('game-container');
+        const startScreen = document.getElementById('start-screen');
+        const nicknameInput = document.getElementById('nickname-input');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const gameStatus = document.getElementById('game-status');
+        const gameView = document.getElementById('game-view');
+        const emailContent = document.getElementById('email-content');
+        const playerScoreEl = document.getElementById('player-score');
+        const scoreBarEl = document.getElementById('score-bar');
+        const scoreDisplayEl = document.getElementById('score-display');
+        const scoreTextEl = document.getElementById('score-text');
+        const feedbackPopup = document.getElementById('feedback-popup');
+        const feedbackTitle = document.getElementById('feedback-title');
+        const feedbackMessage = document.getElementById('feedback-message');
+        const nextBtn = document.getElementById('next-btn');
+        const endGamePopup = document.getElementById('end-game-popup');
+        const endGameMessageEl = document.getElementById('end-game-message');
+        const scoresListEl = document.getElementById('leaderboard');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const quitGameBtn = document.getElementById('quit-game-btn');
+        const thankYouScreen = document.getElementById('thank-you-screen');
+        const thankYouTitle = document.getElementById('thank-you-title');
+        const thankYouMessage = document.getElementById('thank-you-message');
+        const thankYouPlayAgainBtn = document.getElementById('thank-you-play-again-btn');
+        const urlTooltip = document.getElementById('url-tooltip');
+        
+        // ---- Game Logic Functions ----
+        
+        function startGame() {
+            // Only ask for nickname on the very first play
+            if (gameState.player.name === "") {
+                const nickname = nicknameInput.value.trim();
+                if (nickname === "") {
+                    gameStatus.textContent = "Please enter a nickname to start.";
+                    return;
+                }
+                gameState.player.name = nickname;
+            }
+            
+            // Reset session-specific game state
+            gameState.sessionScore = 0;
+            gameState.currentEmailIndex = 0;
+            gameState.isGameOver = false;
+            gameState.emails = shuffleArray([...gameState.scenarios]);
+            gameState.userAnswers = {};
+
+            startScreen.classList.add('hidden');
+            thankYouScreen.classList.add('hidden'); // Hide thank you screen if it was visible
+            gameView.classList.remove('hidden');
+            scoreDisplayEl.classList.remove('hidden'); // Show score display during the game
+            renderEmail(gameState.emails[gameState.currentEmailIndex]);
+            updateSessionScoreDisplay();
+        }
+
+        function renderEmail(email) {
+            // Correctly escape the HTML characters for the sender string to display the brackets
+            const escapedSender = email.sender
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            emailContent.innerHTML = `
+                <div class="mb-4 overflow-x-auto">
+                    <h2 class="text-xl md:text-2xl font-semibold text-gray-800 mb-1">${email.subject}</h2>
+                    <p class="text-gray-500 text-sm" data-full-sender="${escapedSender}">From: <span class="font-medium text-gray-700">${escapedSender}</span></p>
+                </div>
+                <div class="prose max-w-none text-gray-700 mb-6">
+                    <p>${email.body}</p>
+                </div>
+                <div id="action-buttons" class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                    <button id="safe-btn" class="w-full px-6 py-3 bg-green-500 text-white font-semibold rounded-lg shadow-lg hover:bg-green-600 transition-colors duration-300">
+                        <i class="fas fa-check-circle mr-2"></i> Safe
+                    </button>
+                    <button id="phish-btn" class="w-full px-6 py-3 bg-red-500 text-white font-semibold rounded-lg shadow-lg hover:bg-red-600 transition-colors duration-300">
+                        <i class="fas fa-exclamation-triangle mr-2"></i> Spam
+                    </button>
+                </div>
+            `;
+
+            // Attach event listeners to action buttons
+            document.getElementById('safe-btn').addEventListener('click', () => handleAnswer(false, email));
+            document.getElementById('phish-btn').addEventListener('click', () => handleAnswer(true, email));
+
+            // Attach hover listeners to links for URL preview
+            const links = emailContent.querySelectorAll('a');
+            links.forEach(link => {
+                link.addEventListener('mouseover', (e) => {
+                    const href = e.target.getAttribute('href');
+                    if (href) {
+                        urlTooltip.textContent = href;
+                        urlTooltip.style.top = `${e.clientY + 15}px`;
+                        urlTooltip.style.left = `${e.clientX + 15}px`;
+                        urlTooltip.classList.remove('hidden');
+                    }
+                });
+                link.addEventListener('mouseout', () => {
+                    urlTooltip.classList.add('hidden');
+                });
+            });
+        }
+
+        function handleAnswer(isUserPhish, email) {
+            const isCorrect = (isUserPhish === email.isPhishing);
+            const scoreChange = isCorrect ? 1 : 0;
+            
+            // Update both cumulative and session scores
+            gameState.score += scoreChange;
+            gameState.sessionScore += scoreChange;
+            
+            gameState.userAnswers[email.id] = isCorrect;
+            updateSessionScoreDisplay(); // Update in-game score after each answer
+            showFeedback(isCorrect, email);
+
+            // Disable buttons to prevent multiple clicks
+            document.getElementById('safe-btn').disabled = true;
+            document.getElementById('phish-btn').disabled = true;
+        }
+
+        function showFeedback(isCorrect, email) {
+            const title = isCorrect ? "Correct!" : "Oops, Not Quite.";
+            let message = "";
+
+            if (isCorrect) {
+                message = email.isPhishing
+                    ? "You correctly identified a phishing email. You're building a strong defense!"
+                    : "Excellent! This was a safe and legitimate email.";
+            } else {
+                message = email.isPhishing
+                    ? "This was a phishing email. Let's look at the red flags you may have missed."
+                    : "This was a safe email. Not all emails are scams, and it's good to know the difference!";
+            }
+
+            if (email.isPhishing && !isCorrect) {
+                message += "<div class='text-left mt-4 p-4 bg-red-50 rounded-lg border border-red-200 text-red-700'><h4 class='font-bold mb-2'>Red Flags to Watch For:</h4><ul class='list-disc list-inside space-y-1'>" + email.redFlags.map(flag => `<li>${flag}</li>`).join('') + "</ul></div>";
+            }
+
+            feedbackTitle.textContent = title;
+            feedbackMessage.innerHTML = message;
+            feedbackPopup.classList.remove('hidden');
+        }
+
+        function nextEmail() {
+            feedbackPopup.classList.add('hidden');
+            gameState.currentEmailIndex++;
+            if (gameState.currentEmailIndex < gameState.emails.length) {
+                renderEmail(gameState.emails[gameState.currentEmailIndex]);
+            } else {
+                endGame();
+            }
+        }
+        
+        function endGame() {
+            gameState.isGameOver = true;
+            gameView.classList.add('hidden');
+            endGamePopup.classList.remove('hidden');
+            
+            const sessionScore = gameState.sessionScore;
+            const totalEmails = gameState.emails.length;
+            let finalMessage = "";
+
+            if (sessionScore === totalEmails) {
+                finalMessage = "Perfect score! You've successfully identified all the emails.";
+            } else if (sessionScore >= totalEmails * 0.8) {
+                finalMessage = "Fantastic job! You're an expert at spotting the red flags.";
+            } else if (sessionScore >= totalEmails * 0.4) {
+                finalMessage = "Great work! You're getting better with every round.";
+            } else {
+                finalMessage = "Good try! Every game is a chance to learn and improve.";
+            }
+
+            endGameMessageEl.innerHTML = finalMessage;
+
+            // Find the player's entry or create a new one
+            let playerEntry = gameState.scores.find(p => p.name === gameState.player.name);
+            if (playerEntry) {
+                playerEntry.score = gameState.score;
+            } else {
+                gameState.scores.push({ name: gameState.player.name, score: gameState.score });
+            }
+            
+            // Sort and render the scores
+            gameState.scores.sort((a, b) => b.score - a.score);
+            scoresListEl.innerHTML = '';
+            gameState.scores.forEach(item => {
+                const isPlayer = item.name === gameState.player.name;
+                const listItem = document.createElement('li');
+                listItem.className = `flex justify-between items-center text-gray-700 px-4 py-2 rounded-lg ${isPlayer ? 'bg-blue-100 font-semibold' : ''}`;
+                listItem.innerHTML = `
+                    <span>${item.name}</span>
+                    <span class="font-bold text-lg">${item.score}</span>
+                `;
+                scoresListEl.appendChild(listItem);
+            });
+        }
+
+        function showThankYouScreen() {
+            endGamePopup.classList.add('hidden');
+            gameView.classList.add('hidden'); // Ensure game view is hidden
+            thankYouScreen.classList.remove('hidden');
+
+            const sessionScore = gameState.sessionScore;
+            const totalEmails = gameState.emails.length;
+            let title = "";
+            let message = "";
+
+            if (sessionScore === totalEmails) {
+                title = "Flawless Performance!";
+                message = "You've successfully aced this round. Keep up the great work!";
+            } else if (sessionScore >= totalEmails * 0.8) {
+                title = "Excellent Job!";
+                message = "Your sharp eye for detail is making a real difference. Keep it up!";
+            } else if (sessionScore >= totalEmails * 0.4) {
+                title = "You're on the Right Track!";
+                message = "Thanks for playing. Every game is a step toward becoming a cybersecurity champion.";
+            } else {
+                title = "Thanks for Playing!";
+                message = "You did a great job today. Keep practicing, and you'll get better with every attempt.";
+            }
+
+            thankYouTitle.textContent = title;
+            thankYouMessage.textContent = message;
+        }
+        
+        function updateSessionScoreDisplay() {
+            playerScoreEl.textContent = gameState.sessionScore;
+            scoreTextEl.textContent = `Your Score: ${gameState.sessionScore}/${gameState.emails.length}`;
+            const percentage = (gameState.sessionScore / gameState.emails.length) * 100;
+            scoreBarEl.style.width = `${Math.max(0, percentage)}%`; // Ensure bar doesn't go below 0
+        }
+        
+        // Utility function to shuffle array
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // ---- Event Listeners ----
+        startGameBtn.addEventListener('click', startGame);
+        nextBtn.addEventListener('click', nextEmail);
+        playAgainBtn.addEventListener('click', () => {
+            endGamePopup.classList.add('hidden');
+            startGame(); // Just start a new game without resetting the nickname or total score
+        });
+        
+        quitGameBtn.addEventListener('click', showThankYouScreen);
+        
+        thankYouPlayAgainBtn.addEventListener('click', () => {
+            startGame();
+        });
+    </script>
+</body>
+</html>
