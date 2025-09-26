@@ -95,8 +95,13 @@
         
         <!-- Game View -->
         <div id="game-view" class="w-full h-full flex flex-col p-6 hidden">
-            <!-- Player Nickname Header -->
-            <div id="player-nickname-header" class="text-lg font-semibold text-gray-700 mb-4 hidden"></div>
+            <!-- Player Nickname Header with Pause/Quit Button -->
+            <div class="flex justify-between items-center mb-4">
+                <div id="player-nickname-header" class="text-lg font-semibold text-gray-700 hidden"></div>
+                <button id="pause-quit-btn" class="px-4 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-lg hover:bg-gray-600 transition-colors duration-300 hidden">
+                    Pause & Quit
+                </button>
+            </div>
             
             <div id="email-content" class="bg-white rounded-lg p-6 shadow-md border border-gray-200 flex-grow overflow-y-auto min-h-[500px] flex flex-col justify-center items-center">
                 <!-- Email content will be rendered here -->
@@ -119,6 +124,22 @@
                 <button id="next-btn" class="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors duration-300">
                     Next Email
                 </button>
+            </div>
+        </div>
+
+        <!-- Pause/Quit Popup -->
+        <div id="pause-quit-popup" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden transition-opacity duration-300">
+            <div class="bg-white p-8 rounded-xl shadow-xl max-w-lg w-full text-center">
+                <h3 class="text-2xl font-bold mb-4 text-gray-800">Game Paused</h3>
+                <p class="text-gray-600 mb-6">What would you like to do?</p>
+                <div class="space-y-4">
+                    <button id="resume-game-btn" class="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors duration-300">
+                        Resume Game
+                    </button>
+                    <button id="save-quit-btn" class="w-full px-6 py-3 bg-gray-500 text-white font-semibold rounded-lg shadow-lg hover:bg-gray-600 transition-colors duration-300">
+                        Save & Quit to Menu
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -182,7 +203,7 @@
                     signInAnonymously, 
                     signInWithCustomToken, 
                     onAuthStateChanged,
-                    signOut
+                    signOut 
                 } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
                 const { 
                     getFirestore, 
@@ -218,6 +239,14 @@
                 auth = getAuth(app);
 
                 console.log("Firebase app initialized successfully");
+
+                // Add logout functionality for page refresh
+                window.addEventListener('beforeunload', () => {
+                    if (auth && auth.currentUser) {
+                        console.log("Signing out user on page refresh");
+                        signOut(auth).catch(e => console.log("Logout error:", e));
+                    }
+                });
 
                 const initialAuthToken = window.__initial_auth_token || null;
 
@@ -344,48 +373,6 @@
                     }
                 }
 
-                // Add nickname suggestion UI
-                function showNicknameSuggestions(suggestions, inputValue) {
-                    // Remove existing suggestions
-                    const existing = document.getElementById('nickname-suggestions');
-                    if (existing) existing.remove();
-                    
-                    if (suggestions.length === 0) return;
-                    
-                    const suggestionsDiv = document.createElement('div');
-                    suggestionsDiv.id = 'nickname-suggestions';
-                    suggestionsDiv.className = 'absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto';
-                    
-                    suggestions.forEach(suggestion => {
-                        const suggestionItem = document.createElement('div');
-                        suggestionItem.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0';
-                        suggestionItem.innerHTML = `
-                            <div class="flex justify-between items-center">
-                                <span class="font-medium text-gray-800">${suggestion.nickname}</span>
-                                <span class="text-sm text-gray-500">Score: ${suggestion.score}</span>
-                            </div>
-                            <div class="text-xs text-gray-400">${suggestion.exact ? 'Exact match' : 'Similar'}</div>
-                        `;
-                        
-                        suggestionItem.addEventListener('click', () => {
-                            document.getElementById('nickname-input').value = suggestion.nickname;
-                            suggestionsDiv.remove();
-                            
-                            // Update game status for returning user
-                            if (suggestion.exact) {
-                                document.getElementById('game-status').innerHTML = `Welcome back, <strong>${suggestion.nickname}</strong>! Your previous best score: ${suggestion.score}`;
-                            }
-                        });
-                        
-                        suggestionsDiv.appendChild(suggestionItem);
-                    });
-                    
-                    // Position suggestions relative to input
-                    const inputContainer = document.getElementById('nickname-input').parentElement;
-                    inputContainer.style.position = 'relative';
-                    inputContainer.appendChild(suggestionsDiv);
-                }
-
                 // Expose search function globally
                 window.searchNicknames = searchExistingNicknames;
 
@@ -456,6 +443,20 @@
                     }
                 };
 
+                // Expose logout function globally
+                window.logoutUser = async function() {
+                    if (auth && auth.currentUser) {
+                        try {
+                            await signOut(auth);
+                            console.log("User signed out successfully");
+                            // Reset UI to initial state
+                            resetToStartScreen();
+                        } catch (e) {
+                            console.error("Error signing out:", e);
+                        }
+                    }
+                };
+
             } catch (error) {
                 console.error("Firebase initialization failed:", error);
                 console.log("Falling back to offline mode");
@@ -511,6 +512,12 @@
                 } catch (e) {
                     console.error("Error saving to localStorage:", e);
                 }
+            };
+
+            // Mock logout function for offline mode
+            window.logoutUser = async function() {
+                console.log("Logging out (offline mode)");
+                resetToStartScreen();
             };
 
             updateUI('offline');
@@ -595,6 +602,52 @@
         };
 
         // --- Game Logic Functions ---
+        function resetToStartScreen() {
+            // Reset UI to start screen
+            document.getElementById('game-view').classList.add('hidden');
+            document.getElementById('end-game-popup').classList.remove('active-modal');
+            document.getElementById('end-game-popup').classList.add('hidden');
+            document.getElementById('feedback-popup').classList.remove('active-modal');
+            document.getElementById('feedback-popup').classList.add('hidden');
+            document.getElementById('pause-quit-popup').classList.add('hidden');
+            document.getElementById('thank-you-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+            
+            // Reset game state
+            gameState.currentEmailIndex = 0;
+            gameState.sessionScore = 0;
+            gameState.player.name = "";
+            
+            // Reset form
+            document.getElementById('nickname-input').value = "";
+            document.getElementById('game-status').textContent = "Enter your nickname to start.";
+            
+            // Remove nickname suggestions if any
+            const suggestions = document.getElementById('nickname-suggestions');
+            if (suggestions) suggestions.remove();
+        }
+
+        function pauseGame() {
+            document.getElementById('pause-quit-popup').classList.remove('hidden');
+        }
+
+        function resumeGame() {
+            document.getElementById('pause-quit-popup').classList.add('hidden');
+        }
+
+        async function saveAndQuit() {
+            // Save current progress
+            if (gameState.sessionScore > 0) {
+                gameState.score += gameState.sessionScore;
+                if (window.saveScore) {
+                    await window.saveScore();
+                }
+            }
+            
+            document.getElementById('pause-quit-popup').classList.add('hidden');
+            resetToStartScreen();
+        }
+
         function shuffleArray(array) {
             const newArray = [...array];
             for (let i = newArray.length - 1; i > 0; i--) {
@@ -664,7 +717,7 @@
                 const exactMatch = existingMatches.find(match => 
                     match.exact && match.nickname.toLowerCase() === nickname.toLowerCase()
                 );
-
+                
                 if (exactMatch) {
                     // If exact match found, use their score as starting reference
                     gameState.player.name = exactMatch.nickname; // Use the exact case from database
@@ -681,6 +734,7 @@
             
             document.getElementById('player-nickname-header').textContent = `Hello, ${gameState.player.name}! Defend the inbox.`;
             document.getElementById('player-nickname-header').classList.remove('hidden');
+            document.getElementById('pause-quit-btn').classList.remove('hidden');
 
             gameState.sessionScore = 0;
             gameState.currentEmailIndex = 0;
@@ -912,6 +966,9 @@
         
         // --- Event Listeners ---
         document.getElementById('start-game-btn').addEventListener('click', startGame);
+        document.getElementById('pause-quit-btn').addEventListener('click', pauseGame);
+        document.getElementById('resume-game-btn').addEventListener('click', resumeGame);
+        document.getElementById('save-quit-btn').addEventListener('click', saveAndQuit);
 
         document.getElementById('next-btn').addEventListener('click', () => {
              const isLastEmail = gameState.currentEmailIndex === gameState.emails.length - 1;
@@ -935,6 +992,9 @@
         document.getElementById('thank-you-play-again-btn').addEventListener('click', () => {
             startGame();
         });
+
+        // Initialize nickname input functionality
+        setupNicknameInput();
 
     </script>
 </body>
