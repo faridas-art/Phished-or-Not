@@ -401,6 +401,7 @@
                         scores.sort((a, b) => b.score - a.score);
                         gameState.leaderboardScores = scores;
                         
+                        // Re-render the leaderboard if the End Game popup is currently visible
                         if (document.getElementById('end-game-popup').classList.contains('active-modal')) {
                             renderLeaderboard(scores);
                         }
@@ -940,6 +941,14 @@
             if (window.saveScore) {
                 await window.saveScore();
             }
+            
+            // --- FIX START ---
+            // Add a small delay for Firebase mode to ensure the onSnapshot listener 
+            // receives the updated score before we attempt to render the leaderboard.
+            if (!window.useOfflineMode) {
+                 await new Promise(resolve => setTimeout(resolve, 600)); // 600ms buffer
+            }
+            // --- FIX END ---
 
             const sessionScore = gameState.sessionScore;
             const totalEmails = gameState.emails.length;
@@ -954,6 +963,7 @@
             }
 
             document.getElementById('end-game-message').innerHTML = finalMessage;
+            // The score is now guaranteed (or highly likely) to be updated in gameState.leaderboardScores
             renderLeaderboard(gameState.leaderboardScores);
         }
 
