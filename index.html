@@ -291,9 +291,8 @@
                 window.loadPlayerDataByNickname = loadPlayerDataByNickname;
                 window.searchNicknames = searchExistingNicknames;
                 
-                // Initialize Firebase Ready flag and start listening for scores
+                // Initialize Firebase Ready flag
                 isFirebaseReady = true;
-                listenForScores(db);
                 
                 console.log("Firebase app initialized and core services exposed.");
 
@@ -398,7 +397,7 @@
                     }
                 }
 
-                function listenForScores(database) {
+                window.listenForScores = function(database) {
                     console.log("Setting up leaderboard listener...");
                     if (!database) return;
                     
@@ -429,6 +428,7 @@
                         console.error("Error listening to leaderboard:", error);
                     });
                 }
+
 
                 // Expose Firebase functions to global scope
                 window.saveScore = async function() {
@@ -804,6 +804,11 @@
                     await signInAnonymously(window.auth); 
                     
                     // The onAuthStateChanged listener runs now, setting window.db, window.auth etc.
+                    
+                    // **CRUCIAL: Start listening for scores NOW, after authentication is complete**
+                    if (window.listenForScores) {
+                        window.listenForScores(window.db);
+                    }
                     
                     // Load player data by nickname
                     const playerData = await window.loadPlayerDataByNickname(nickname, window.db);
