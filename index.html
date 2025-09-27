@@ -51,7 +51,7 @@
             apiKey: "AIzaSyCQ22h4DxNd8NQm1dyJpdh-sHADu70f3YQ",
             authDomain: "phish-or-not-project.firebaseapp.com",
             projectId: "phish-or-not-project",
-            storageBucket: "phish-or-not-project.firebase-storage.app",
+            storageBucket: "phish-or-not-project.firebasestorage.app",
             messagingSenderId: "455143280251",
             appId: "1:455143280251:web:3d7dd344688b1c1c2edcde",
             measurementId: "G-CF68SPNSJM"
@@ -78,15 +78,20 @@
             <div id="auth-status" class="flex flex-col items-center justify-center mb-6">
                 <div id="loading-spinner" class="loader mb-2"></div>
                 <p id="loading-message" class="text-gray-500">Checking connection...</p>
-                <p id="user-info" class="text-xs text-gray-500 mt-2 hidden"></p>
-            </div>
+                </div>
 
             <p id="game-status" class="text-center text-gray-600 mb-4">Enter your nickname to start.</p>
             <input type="text" id="nickname-input" placeholder="Your Nickname" class="w-full max-w-xs px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 text-center">
-            <button id="start-game-btn" class="w-full max-w-xs px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors duration-300 disabled:opacity-50" disabled>
-                Start Game
-            </button>
-        </div>
+            
+            <div class="space-y-4 w-full max-w-xs mx-auto">
+                <button id="start-game-btn" class="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors duration-300 disabled:opacity-50" disabled>
+                    Play
+                </button>
+                <button id="view-scores-btn" class="w-full px-6 py-3 bg-gray-300 text-gray-800 font-semibold rounded-lg shadow-lg hover:bg-gray-400 transition-colors duration-300">
+                    View Scores
+                </button>
+            </div>
+            </div>
         
         <div id="game-view" class="w-full h-full flex flex-col p-6 hidden">
             <div class="flex justify-between items-center mb-4">
@@ -151,10 +156,16 @@
         <div id="thank-you-screen" class="p-8 text-center hidden">
             <h1 id="thank-you-title" class="text-5xl font-bold text-gray-800 mb-4"></h1>
             <p id="thank-you-message" class="text-xl text-gray-500 mb-8"></p>
-            <button id="thank-you-play-again-btn" class="w-full max-w-xs px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors duration-300">
-                Play More
-            </button>
-        </div>
+            
+            <div class="space-y-4 w-full max-w-xs mx-auto">
+                <button id="thank-you-play-again-btn" class="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors duration-300">
+                    Play More
+                </button>
+                <button id="play-as-another-btn" class="w-full px-6 py-3 bg-gray-500 text-white font-semibold rounded-lg shadow-lg hover:bg-gray-600 transition-colors duration-300">
+                    Play as another player
+                </button>
+            </div>
+            </div>
     </div>
 
     <div id="url-tooltip" class="hidden"></div>
@@ -199,17 +210,13 @@
 
         // --- UI Only Initialization (Not used for Firebase, but kept for offline fallback) ---
         function initializeUIOnly() {
-            // Placeholder/Fallback function
             const loadingSpinner = document.getElementById('loading-spinner');
             const loadingMessage = document.getElementById('loading-message');
-            const userInfoEl = document.getElementById('user-info');
             const startGameBtn = document.getElementById('start-game-btn');
 
             loadingSpinner.classList.add('hidden');
             loadingMessage.textContent = "Ready to play! Enter your nickname to start.";
             loadingMessage.className = "text-indigo-600";
-            userInfoEl.textContent = "Authentication will happen when you start playing";
-            userInfoEl.classList.remove('hidden');
             startGameBtn.disabled = false;
         }
 
@@ -268,7 +275,7 @@
                     setDoc, 
                     onSnapshot, 
                     collection, 
-                    getDocs // <-- Using getDocs for synchronous fetch
+                    getDocs
                 } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
 
                 let db, auth;
@@ -293,15 +300,15 @@
                 
                 console.log("Firebase app initialized. Signing in visitor anonymously...");
                 
-                // **CRITICAL CHANGE 1: Sign in the visitor immediately on page load for read access**
+                // Sign in the visitor immediately on page load for read access
                 await signInAnonymously(auth); 
                 
-                // **CRITICAL CHANGE 2: Start the leaderboard listener immediately after sign-in**
+                // Start the leaderboard listener immediately after sign-in
                 if (window.listenForScores) {
                     window.listenForScores(db);
                 }
                 
-                // **NEW: Expose synchronous fetch function**
+                // Expose synchronous fetch function
                 window.fetchLeaderboardScores = fetchLeaderboardScores;
 
                 // Update UI to show successful connection
@@ -314,16 +321,14 @@
                     }
                 });
                 
-                // Firebase-specific functions
-                
-                // NEW: Direct fetch function for guaranteed latest scores (used in endGame)
+                // NEW: Direct fetch function for guaranteed latest scores (used in endGame and viewScoresAsVisitor)
                 async function fetchLeaderboardScores(database) {
                     if (!database) return [];
                     const appId = window.__app_id || 'default-app-id';
                     const playersColRef = collection(database, `artifacts/${appId}/players`);
 
                     try {
-                        const querySnapshot = await getDocs(playersColRef); // <-- One-time synchronous fetch
+                        const querySnapshot = await getDocs(playersColRef); 
                         const scores = [];
                         querySnapshot.forEach((doc) => {
                             const nickname = doc.id;
@@ -337,14 +342,15 @@
                         });
                         
                         scores.sort((a, b) => b.score - a.score);
-                        gameState.leaderboardScores = scores; // Update global state
+                        gameState.leaderboardScores = scores; 
                         return scores; 
                     } catch (e) {
                         console.error("Error fetching leaderboard scores:", e);
                         return [];
                     }
                 }
-                
+
+                // Firebase-specific functions
                 async function loadPlayerDataByNickname(nickname, database) {
                     if (!database || !nickname) return null;
                     const appId = window.__app_id || 'default-app-id';
@@ -545,31 +551,26 @@
             updateUI('offline');
         }
 
-        // --- UI Update Function ---
+        // --- UI Update Function (Simplified) ---
         function updateUI(mode, userId = null) {
             const loadingSpinner = document.getElementById('loading-spinner');
             const loadingMessage = document.getElementById('loading-message');
-            const userInfoEl = document.getElementById('user-info');
             const startGameBtn = document.getElementById('start-game-btn');
 
             loadingSpinner.classList.add('hidden');
             
             if (mode === 'firebase') {
-                loadingMessage.textContent = "Connected! Smart search and leaderboards active.";
-                loadingMessage.className = "text-green-600";
-                userInfoEl.textContent = `Visitor ID: ${userId ? userId.substring(0, 8) + '...' : 'N/A'}`;
-                userInfoEl.classList.remove('hidden');
+                loadingMessage.textContent = "Connected";
+                loadingMessage.className = "text-green-600 font-semibold";
             } else {
                 loadingMessage.textContent = "Playing offline - scores saved locally.";
                 loadingMessage.className = "text-yellow-600";
-                userInfoEl.textContent = "Offline Mode";
-                userInfoEl.classList.remove('hidden');
             }
             
             startGameBtn.disabled = false;
         }
 
-        // --- Game State & Game Logic (NO CHANGES BELOW THIS LINE) ---
+        // --- Game State & Game Logic ---
         const gameState = {
             currentEmail: null,
             score: 0,
@@ -637,16 +638,21 @@
             // Reset game state
             gameState.currentEmailIndex = 0;
             gameState.sessionScore = 0;
-            gameState.player.name = "";
+            gameState.player.name = ""; // Crucial for new player flow
             
             // Reset form
             document.getElementById('nickname-input').value = "";
             document.getElementById('game-status').textContent = "Enter your nickname to start.";
             
-            // Reset button state
+            // Reset button text
             const startBtn = document.getElementById('start-game-btn');
             startBtn.disabled = false;
-            startBtn.textContent = "Start Game";
+            startBtn.textContent = "Play";
+            
+            // Restore end game popup buttons (in case they were modified by visitor view)
+            document.getElementById('end-game-message').innerHTML = "Game Over!";
+            document.getElementById('play-again-btn').textContent = "Play More";
+            document.getElementById('quit-game-btn').textContent = "That's it for now";
             
             // Remove nickname suggestions if any
             const suggestions = document.getElementById('nickname-suggestions');
@@ -672,7 +678,7 @@
             
             document.getElementById('pause-quit-popup').classList.add('hidden');
             
-            // NEW: Sign out the temporary anonymous user (resets session)
+            // Sign out the temporary anonymous user (resets session)
             if (window.logoutUser) {
                 await window.logoutUser();
             } else {
@@ -790,20 +796,20 @@
                     console.error("Error loading player profile:", e);
                     document.getElementById('game-status').textContent = "Error loading profile. Check console for details.";
                     startBtn.disabled = false;
-                    startBtn.textContent = "Start Game";
+                    startBtn.textContent = "Play";
                     return;
                 }
             } else {
                 console.error("System not ready or configuration error.");
                 document.getElementById('game-status').textContent = "System not ready. Try refreshing.";
                 startBtn.disabled = false;
-                startBtn.textContent = "Start Game";
+                startBtn.textContent = "Play";
                 return;
             }
             
             // Reset button state
             startBtn.disabled = false;
-            startBtn.textContent = "Start Game";
+            startBtn.textContent = "Play";
             
             document.getElementById('player-nickname-header').textContent = `Hello, ${gameState.player.name}! Defend the inbox.`;
             document.getElementById('player-nickname-header').classList.remove('hidden');
@@ -821,6 +827,42 @@
             renderEmail(gameState.emails[gameState.currentEmailIndex]);
             updateSessionScoreDisplay();
         }
+        
+        // NEW: Function to view scores without starting a game
+        async function viewScoresAsVisitor() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('end-game-popup').classList.add('active-modal');
+            document.getElementById('end-game-popup').classList.remove('hidden');
+            
+            // Customize popup for visitor view
+            document.getElementById('end-game-message').innerHTML = "Check out the top players!";
+            document.getElementById('play-again-btn').textContent = "Go to Play Screen";
+            document.getElementById('quit-game-btn').textContent = "Exit";
+            
+            let scoresToRender = gameState.leaderboardScores;
+
+            if (!window.useOfflineMode && window.fetchLeaderboardScores && window.db) {
+                 // Fetch the latest scores explicitly
+                 scoresToRender = await window.fetchLeaderboardScores(window.db); 
+            }
+            
+            // Temporarily override button actions for visitor view to return to start screen
+            const playAgainButton = document.getElementById('play-again-btn');
+            const quitGameButton = document.getElementById('quit-game-btn');
+            
+            // We clone nodes to remove existing listeners (safest way to remove all listeners)
+            const newPlayAgainButton = playAgainButton.cloneNode(true);
+            const newQuitGameButton = quitGameButton.cloneNode(true);
+            
+            playAgainButton.parentNode.replaceChild(newPlayAgainButton, playAgainButton);
+            quitGameButton.parentNode.replaceChild(newQuitGameButton, quitGameButton);
+
+            newPlayAgainButton.addEventListener('click', resetToStartScreen);
+            newQuitGameButton.addEventListener('click', resetToStartScreen);
+
+            renderLeaderboard(scoresToRender);
+        }
+        // END NEW FUNCTION
 
         function showNicknameSuggestions(suggestions, inputValue) {
             // Remove existing suggestions
@@ -850,7 +892,7 @@
                     
                     // Update game status for returning user
                     if (suggestion.exact) {
-                        document.getElementById('game-status').innerHTML = `Found existing profile: <strong>${suggestion.nickname}</strong> (Score: ${suggestion.score}). Click Start Game to continue.`;
+                        document.getElementById('game-status').innerHTML = `Found existing profile: <strong>${suggestion.nickname}</strong> (Score: ${suggestion.score}). Click Play to continue.`;
                     }
                 });
                 
@@ -971,12 +1013,33 @@
                 await window.saveScore();
             }
             
-            // --- FIX: Explicitly fetch the latest scores immediately after saving ---
+            // Restore default button text for end game popup
+            document.getElementById('end-game-message').innerHTML = "Game Over!";
+            document.getElementById('play-again-btn').textContent = "Play More";
+            document.getElementById('quit-game-btn').textContent = "That's it for now";
+
+            // Re-apply original button listeners (in case they were modified by visitor view)
+            const playAgainButton = document.getElementById('play-again-btn');
+            const quitGameButton = document.getElementById('quit-game-btn');
+            
+            const newPlayAgainButton = playAgainButton.cloneNode(true);
+            const newQuitGameButton = quitGameButton.cloneNode(true);
+            
+            playAgainButton.parentNode.replaceChild(newPlayAgainButton, playAgainButton);
+            quitGameButton.parentNode.replaceChild(newQuitGameButton, quitGameButton);
+
+            newPlayAgainButton.addEventListener('click', () => {
+                document.getElementById('end-game-popup').classList.remove('active-modal');
+                document.getElementById('end-game-popup').classList.add('hidden');
+                startGame();
+            });
+            newQuitGameButton.addEventListener('click', showThankYouScreen);
+            
+            
+            // Explicitly fetch the latest scores immediately after saving
             if (!window.useOfflineMode && window.fetchLeaderboardScores && window.db) {
-                 // Wait for the explicit data fetch to complete
                  await window.fetchLeaderboardScores(window.db); 
             }
-            // --- END FIX ---
 
             const sessionScore = gameState.sessionScore;
             const totalEmails = gameState.emails.length;
@@ -1047,6 +1110,7 @@
         
         // --- Event Listeners ---
         document.getElementById('start-game-btn').addEventListener('click', startGame);
+        document.getElementById('view-scores-btn').addEventListener('click', viewScoresAsVisitor); // NEW LISTENER
         document.getElementById('pause-quit-btn').addEventListener('click', pauseGame);
         document.getElementById('resume-game-btn').addEventListener('click', resumeGame);
         document.getElementById('save-quit-btn').addEventListener('click', saveAndQuit);
@@ -1062,16 +1126,24 @@
              }
         });
 
-        document.getElementById('play-again-btn').addEventListener('click', () => {
-            document.getElementById('end-game-popup').classList.remove('active-modal');
-            document.getElementById('end-game-popup').classList.add('hidden');
+        // The original play-again and quit-game buttons on the end screen
+        // are now handled dynamically inside the endGame function to prevent conflicts
+        // with the viewScoresAsVisitor function's temporary listener override.
+
+        document.getElementById('thank-you-play-again-btn').addEventListener('click', () => {
+            // "Play More" with the same player
             startGame();
         });
         
-        document.getElementById('quit-game-btn').addEventListener('click', showThankYouScreen);
-        
-        document.getElementById('thank-you-play-again-btn').addEventListener('click', () => {
-            startGame();
+        // NEW LISTENER: Play as another player (logs out and resets)
+        document.getElementById('play-as-another-btn').addEventListener('click', () => {
+            if (window.logoutUser) {
+                // Firebase: Logs out the anonymous session and refreshes
+                window.logoutUser();
+            } else {
+                // Offline: Simple reset
+                resetToStartScreen();
+            }
         });
 
         // Initialize nickname input functionality
