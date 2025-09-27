@@ -51,7 +51,7 @@
             apiKey: "AIzaSyCQ22h4DxNd8NQm1dyJpdh-sHADu70f3YQ",
             authDomain: "phish-or-not-project.firebaseapp.com",
             projectId: "phish-or-not-project",
-            storageBucket: "phish-or-not-project.firebasestorage.app",
+            storageBucket: "phish-or-not-project.firebase-storage.app",
             messagingSenderId: "455143280251",
             appId: "1:455143280251:web:3d7dd344688b1c1c2edcde",
             measurementId: "G-CF68SPNSJM"
@@ -268,7 +268,7 @@
                     setDoc, 
                     onSnapshot, 
                     collection, 
-                    getDocs
+                    getDocs // <-- Using getDocs for synchronous fetch
                 } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
 
                 let db, auth;
@@ -300,6 +300,9 @@
                 if (window.listenForScores) {
                     window.listenForScores(db);
                 }
+                
+                // **NEW: Expose synchronous fetch function**
+                window.fetchLeaderboardScores = fetchLeaderboardScores;
 
                 // Update UI to show successful connection
                 updateUI('firebase', auth.currentUser.uid);
@@ -310,9 +313,38 @@
                         signOut(auth).catch(e => console.log("Logout error:", e));
                     }
                 });
-
-
+                
                 // Firebase-specific functions
+                
+                // NEW: Direct fetch function for guaranteed latest scores (used in endGame)
+                async function fetchLeaderboardScores(database) {
+                    if (!database) return [];
+                    const appId = window.__app_id || 'default-app-id';
+                    const playersColRef = collection(database, `artifacts/${appId}/players`);
+
+                    try {
+                        const querySnapshot = await getDocs(playersColRef); // <-- One-time synchronous fetch
+                        const scores = [];
+                        querySnapshot.forEach((doc) => {
+                            const nickname = doc.id;
+                            const data = doc.data();
+                            scores.push({
+                                id: nickname,
+                                name: nickname,
+                                score: data.score || 0,
+                                gamesPlayed: data.gamesPlayed || 0
+                            });
+                        });
+                        
+                        scores.sort((a, b) => b.score - a.score);
+                        gameState.leaderboardScores = scores; // Update global state
+                        return scores; 
+                    } catch (e) {
+                        console.error("Error fetching leaderboard scores:", e);
+                        return [];
+                    }
+                }
+                
                 async function loadPlayerDataByNickname(nickname, database) {
                     if (!database || !nickname) return null;
                     const appId = window.__app_id || 'default-app-id';
@@ -374,8 +406,6 @@
                         return matches.slice(0, 5);
                     } catch (e) {
                         console.error("Error searching nicknames:", e);
-                        // The user is authenticated, so if search fails, it's a database read error
-                        // The initial anonymous sign-in should prevent this if rules are correct.
                         return [];
                     }
                 }
@@ -401,7 +431,6 @@
                         scores.sort((a, b) => b.score - a.score);
                         gameState.leaderboardScores = scores;
                         
-                        // Re-render the leaderboard if the End Game popup is currently visible
                         if (document.getElementById('end-game-popup').classList.contains('active-modal')) {
                             renderLeaderboard(scores);
                         }
@@ -942,13 +971,12 @@
                 await window.saveScore();
             }
             
-            // --- FIX START ---
-            // Add a small delay for Firebase mode to ensure the onSnapshot listener 
-            // receives the updated score before we attempt to render the leaderboard.
-            if (!window.useOfflineMode) {
-                 await new Promise(resolve => setTimeout(resolve, 600)); // 600ms buffer
+            // --- FIX: Explicitly fetch the latest scores immediately after saving ---
+            if (!window.useOfflineMode && window.fetchLeaderboardScores && window.db) {
+                 // Wait for the explicit data fetch to complete
+                 await window.fetchLeaderboardScores(window.db); 
             }
-            // --- FIX END ---
+            // --- END FIX ---
 
             const sessionScore = gameState.sessionScore;
             const totalEmails = gameState.emails.length;
@@ -963,7 +991,7 @@
             }
 
             document.getElementById('end-game-message').innerHTML = finalMessage;
-            // The score is now guaranteed (or highly likely) to be updated in gameState.leaderboardScores
+            // The score is now guaranteed to be updated in gameState.leaderboardScores
             renderLeaderboard(gameState.leaderboardScores);
         }
 
